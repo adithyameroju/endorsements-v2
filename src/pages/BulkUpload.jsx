@@ -72,7 +72,7 @@ export default function BulkUpload() {
       />
       <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} />
 
-      <div className="max-w-2xl space-y-5">
+      <div className="space-y-5">
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">
           <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
             <FileSpreadsheet size={18} className="text-blue-600" />

@@ -190,9 +190,12 @@ export default function EndorsementHistory() {
         </div>
       </div>
 
-      {/* Error detail panel with inline corrections */}
-      {errorPanel && (
-        <ErrorCorrectionModal entry={errorPanel} onClose={() => setErrorPanel(null)} />
+      {/* Error detail panel – different UX for bulk vs quick */}
+      {errorPanel && errorPanel.type === 'quick' && (
+        <QuickErrorModal entry={errorPanel} onClose={() => setErrorPanel(null)} />
+      )}
+      {errorPanel && errorPanel.type !== 'quick' && (
+        <BulkErrorModal entry={errorPanel} onClose={() => setErrorPanel(null)} />
       )}
 
       {/* In Progress detail panel */}
@@ -290,7 +293,198 @@ function ProgressModal({ entry, onClose }) {
   )
 }
 
-function ErrorCorrectionModal({ entry, onClose }) {
+function QuickErrorModal({ entry, onClose }) {
+  const { updateEntry } = useEndorsements()
+  const details = entry.details || []
+
+  const generateErrors = (emp) => {
+    const errors = {}
+    if (!emp.name?.trim()) errors.name = 'Name is required'
+    if (!emp.id?.trim()) errors.id = 'Employee ID is required'
+    if (!emp.department?.trim()) errors.department = 'Department is required'
+    if (!emp.designation?.trim()) errors.designation = 'Designation is required'
+    if (emp.email && !/\S+@\S+\.\S+/.test(emp.email)) errors.email = 'Invalid email format'
+    if (emp.mobile && !/^\d{10}$/.test(emp.mobile)) errors.mobile = 'Must be 10 digits'
+    if (!emp.email?.trim()) errors.email = 'Email is required'
+    if (!emp.dob?.trim()) errors.dob = 'Date of birth is required'
+    return errors
+  }
+
+  const initialEmployees = details.map(d => ({
+    ...d,
+    email: d.email || '',
+    dob: d.dob || '',
+    mobile: d.mobile || '',
+    gender: d.gender || '',
+    doj: d.doj || '',
+  }))
+
+  const [employees, setEmployees] = useState(initialEmployees)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
+  const [editingIdx, setEditingIdx] = useState(0)
+
+  const updateField = (idx, field, value) => {
+    setEmployees(prev => prev.map((e, i) => i === idx ? { ...e, [field]: value } : e))
+  }
+
+  const allValid = employees.every(emp => Object.keys(generateErrors(emp)).length === 0)
+
+  const handleResubmit = () => {
+    setSubmitting(true)
+    setTimeout(() => {
+      setSubmitting(false)
+      setSubmitted(true)
+      updateEntry(entry.id, { status: 'Success' })
+    }, 1200)
+  }
+
+  if (submitted) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+        <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <div className="px-6 py-10 text-center">
+            <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 size={28} className="text-emerald-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">Corrections Submitted</h3>
+            <p className="text-sm text-gray-500">The employee details have been corrected and resubmitted successfully.</p>
+          </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex justify-end rounded-b-2xl">
+            <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-white bg-emerald-600 rounded-lg hover:bg-emerald-700 cursor-pointer">Done</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const emp = employees[editingIdx] || employees[0]
+  const errors = generateErrors(emp)
+  const errorCount = Object.keys(errors).length
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl mx-4 overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
+              <AlertCircle size={18} className="text-red-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-900">Fix & Resubmit</h3>
+              <p className="text-xs text-gray-500">{entry.action} &middot; {formatDate(entry.date)}</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg cursor-pointer">
+            <X size={18} />
+          </button>
+        </div>
+
+        {employees.length > 1 && (
+          <div className="px-6 pt-4 pb-0 flex-shrink-0">
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {employees.map((e, idx) => {
+                const errs = generateErrors(e)
+                const hasErrors = Object.keys(errs).length > 0
+                return (
+                  <button
+                    key={idx}
+                    onClick={() => setEditingIdx(idx)}
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer border ${
+                      idx === editingIdx
+                        ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                        : hasErrors
+                          ? 'bg-red-50/50 border-red-200 text-red-700 hover:bg-red-50'
+                          : 'bg-emerald-50/50 border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {hasErrors ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
+                    {e.name || `Employee ${idx + 1}`}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-y-auto px-6 py-5">
+          {errorCount > 0 && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 mb-5 flex items-start gap-2.5">
+              <AlertCircle size={16} className="text-red-500 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-red-900">{errorCount} field{errorCount > 1 ? 's' : ''} need{errorCount === 1 ? 's' : ''} attention</p>
+                <p className="text-xs text-red-700 mt-0.5">Fix the highlighted fields below and resubmit.</p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
+              <QuickField label="Full Name" required value={emp.name} error={errors.name}
+                onChange={v => updateField(editingIdx, 'name', v)} placeholder="e.g. Rahul Sharma" />
+              <QuickField label="Employee ID" required value={emp.id} error={errors.id}
+                onChange={v => updateField(editingIdx, 'id', v)} placeholder="e.g. EMP001" />
+              <QuickField label="Email" required type="email" value={emp.email} error={errors.email}
+                onChange={v => updateField(editingIdx, 'email', v)} placeholder="e.g. rahul@acko.com" />
+              <QuickField label="Date of Birth" required type="date" value={emp.dob} error={errors.dob}
+                onChange={v => updateField(editingIdx, 'dob', v)} />
+              <QuickField label="Mobile" type="tel" value={emp.mobile} error={errors.mobile}
+                onChange={v => updateField(editingIdx, 'mobile', v)} placeholder="e.g. 9876543210" />
+              <QuickField label="Department" required value={emp.department} error={errors.department}
+                onChange={v => updateField(editingIdx, 'department', v)} placeholder="e.g. Engineering" />
+              <QuickField label="Designation" required value={emp.designation} error={errors.designation}
+                onChange={v => updateField(editingIdx, 'designation', v)} placeholder="e.g. Software Engineer" />
+              <QuickField label="Gender" value={emp.gender}
+                onChange={v => updateField(editingIdx, 'gender', v)} placeholder="e.g. Male" />
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 flex items-center justify-between flex-shrink-0">
+          <p className="text-xs text-gray-500">
+            {allValid
+              ? <span className="text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 size={12} /> All errors resolved – ready to resubmit</span>
+              : <span className="text-gray-500">Fix all highlighted fields to resubmit</span>}
+          </p>
+          <button
+            onClick={handleResubmit}
+            disabled={!allValid || submitting}
+            className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer inline-flex items-center gap-1.5"
+          >
+            {submitting ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            {submitting ? 'Resubmitting...' : 'Fix & Resubmit'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function QuickField({ label, type = 'text', required, value, onChange, placeholder, error }) {
+  return (
+    <div>
+      <label className="block text-xs font-medium text-gray-600 mb-1.5">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value || ''}
+        onChange={e => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`w-full px-3 py-2 text-sm border rounded-lg bg-white transition-all ${
+          error
+            ? 'border-red-300 bg-red-50/30 ring-1 ring-red-200'
+            : value
+              ? 'border-emerald-300 bg-emerald-50/20'
+              : 'border-gray-200'
+        }`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1 flex items-center gap-1"><AlertCircle size={10} /> {error}</p>}
+    </div>
+  )
+}
+
+function BulkErrorModal({ entry, onClose }) {
   const { updateEntry } = useEndorsements()
   const [mode, setMode] = useState('summary')
   const [rows, setRows] = useState([
