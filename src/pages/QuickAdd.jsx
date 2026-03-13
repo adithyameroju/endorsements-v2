@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronLeft, Eye, CheckCircle, User, Trash2, ChevronUp, Shield, Users, AlertCircle } from 'lucide-react'
+import { Plus, ChevronDown, ChevronLeft, Eye, CheckCircle, User, Trash2, ChevronUp, Shield, Users, AlertCircle, UserPlus, X } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
@@ -57,6 +57,7 @@ export default function QuickAdd() {
   const [expandedId, setExpandedId] = useState(employees[0].id)
   const [showPreview, setShowPreview] = useState(false)
   const [touchedMap, setTouchedMap] = useState({})
+  const [nudgeDismissed, setNudgeDismissed] = useState(false)
 
   const updateEmployee = (index, field, value) => {
     const updated = [...employees]
@@ -85,6 +86,7 @@ export default function QuickAdd() {
     const newEmp = emptyEmployee()
     setEmployees(prev => [...prev, newEmp])
     setExpandedId(newEmp.id)
+    setNudgeDismissed(true)
   }
 
   const removeEmployee = (index) => {
@@ -195,6 +197,24 @@ export default function QuickAdd() {
           breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Quick Add' }]}
         />
         <Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={1} />
+
+        {employees.length === 1 && !nudgeDismissed && (
+          <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl mt-1 mb-1">
+            <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+              <Users size={16} className="text-indigo-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-indigo-900">You can add up to 5 employees at once</p>
+              <p className="text-xs text-indigo-600/70 mt-0.5">Fill in details for one, then use the <span className="font-semibold">+ Add Employee</span> button below to add more.</p>
+            </div>
+            <button
+              onClick={() => setNudgeDismissed(true)}
+              className="p-1 text-indigo-400 hover:text-indigo-600 rounded-md hover:bg-indigo-100 transition-colors cursor-pointer flex-shrink-0"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto space-y-3 pb-4">
@@ -350,7 +370,18 @@ export default function QuickAdd() {
 
       {/* Footer */}
       <div className="flex-shrink-0 bg-white border-t border-gray-200 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3.5 flex items-center justify-between">
-        <span className="text-sm text-gray-500">{employees.length} employee{employees.length > 1 ? 's' : ''} added</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{employees.length} employee{employees.length > 1 ? 's' : ''} added</span>
+          {employees.length < 5 && (
+            <button
+              onClick={addEmployee}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer"
+            >
+              <UserPlus size={13} /> Add Employee
+              <span className="text-indigo-400 font-normal">({employees.length}/5)</span>
+            </button>
+          )}
+        </div>
         <button onClick={handlePreview} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><Eye size={16} /> Preview & Submit</button>
       </div>
     </div>
