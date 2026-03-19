@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Eye, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Clock, X, Upload, Loader2, FileText, Pencil, Check, ArrowUpRight } from 'lucide-react'
+import { Eye, Download, ChevronLeft, ChevronRight, AlertCircle, CheckCircle2, Clock, X, Loader2, FileText, Pencil, Check, ArrowUpRight, Heart, Shield, ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react'
 import { useEndorsements } from '../store/EndorsementStore'
+import { basePlans, gpaBasePlans, dependentRelations } from '../data/mockData'
 
 export default function EndorsementHistory() {
   const { history } = useEndorsements()
@@ -57,7 +58,7 @@ export default function EndorsementHistory() {
                 type="date"
                 value={dateFrom}
                 onChange={e => { setDateFrom(e.target.value); setCurrentPage(1) }}
-                className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-gray-300"
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-gray-300 cursor-pointer min-w-[120px]"
                 title="From date"
               />
               <span className="text-xs text-gray-400">–</span>
@@ -65,7 +66,7 @@ export default function EndorsementHistory() {
                 type="date"
                 value={dateTo}
                 onChange={e => { setDateTo(e.target.value); setCurrentPage(1) }}
-                className="px-2 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-gray-300"
+                className="px-2.5 py-1 text-xs border border-gray-200 rounded-lg bg-white hover:border-gray-300 cursor-pointer min-w-[120px]"
                 title="To date"
               />
 
@@ -317,6 +318,8 @@ function QuickErrorModal({ entry, onClose }) {
     mobile: d.mobile || '',
     gender: d.gender || '',
     doj: d.doj || '',
+    gmcBase: d.gmcBase || '',
+    gpaBase: d.gpaBase || '',
   }))
 
   const [employees, setEmployees] = useState(initialEmployees)
@@ -418,7 +421,9 @@ function QuickErrorModal({ entry, onClose }) {
             </div>
           )}
 
-          <div className="space-y-4">
+          {/* Basic Information */}
+          <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100/60">
+            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Basic Information</p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 gap-y-4">
               <QuickField label="Full Name" required value={emp.name} error={errors.name}
                 onChange={v => updateField(editingIdx, 'name', v)} placeholder="e.g. Rahul Sharma" />
@@ -436,6 +441,45 @@ function QuickErrorModal({ entry, onClose }) {
                 onChange={v => updateField(editingIdx, 'designation', v)} placeholder="e.g. Software Engineer" />
               <QuickField label="Gender" value={emp.gender}
                 onChange={v => updateField(editingIdx, 'gender', v)} placeholder="e.g. Male" />
+            </div>
+          </div>
+
+          {/* Insurance Plans */}
+          <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100/60 mt-4">
+            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Insurance Plans</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <Heart size={14} className="text-blue-600" />
+                  <span className="text-xs font-semibold text-gray-900">GMC</span>
+                  <span className="text-[10px] text-gray-400">Group Mediclaim</span>
+                </div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Base Plan</label>
+                <select
+                  value={emp.gmcBase || ''}
+                  onChange={e => updateField(editingIdx, 'gmcBase', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                >
+                  <option value="">Select GMC base plan</option>
+                  {basePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
+              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <Shield size={14} className="text-violet-600" />
+                  <span className="text-xs font-semibold text-gray-900">GPA</span>
+                  <span className="text-[10px] text-gray-400">Personal Accident</span>
+                </div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Base Plan</label>
+                <select
+                  value={emp.gpaBase || ''}
+                  onChange={e => updateField(editingIdx, 'gpaBase', e.target.value)}
+                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                >
+                  <option value="">Select GPA base plan</option>
+                  {gpaBasePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+              </div>
             </div>
           </div>
         </div>
@@ -488,18 +532,40 @@ function BulkErrorModal({ entry, onClose }) {
   const { updateEntry } = useEndorsements()
   const [mode, setMode] = useState('summary')
   const [rows, setRows] = useState([
-    { id: 1, empId: 'EMP101', name: 'Raj Verma', email: '', dob: '1990-05-12', error: 'Missing email address' },
-    { id: 2, empId: 'EMP102', name: 'Sneha Das', email: 'sneha.d@acko.com', dob: '', error: 'Missing date of birth' },
-    { id: 3, empId: '', name: 'Kiran Rao', email: 'kiran.r@acko.com', dob: '1995-08-20', error: 'Missing employee ID' },
+    { id: 1, empId: 'EMP101', name: 'Raj Verma', email: '', dob: '1990-05-12', mobile: '9876540001', gender: 'Male', department: 'Engineering', designation: 'Software Engineer', doj: '2025-06-01', gmcBase: '', gpaBase: '', dependents: [{ name: 'Meera Verma', relation: 'Spouse', dob: '1992-03-10' }], errors: ['Missing email address'] },
+    { id: 2, empId: 'EMP102', name: 'Sneha Das', email: 'sneha.d@acko.com', dob: '', mobile: '9876540002', gender: 'Female', department: 'Product', designation: 'Manager', doj: '2025-04-15', gmcBase: '', gpaBase: '', dependents: [], errors: ['Missing date of birth'] },
+    { id: 3, empId: '', name: 'Kiran Rao', email: 'kiran.r@acko.com', dob: '1995-08-20', mobile: '9876540003', gender: 'Male', department: 'Design', designation: '', doj: '2025-08-10', gmcBase: '', gpaBase: '', dependents: [{ name: 'Sunita Rao', relation: 'Mother', dob: '1965-11-05' }], errors: ['Missing employee ID', 'Missing designation'] },
   ])
   const [resubmitting, setResubmitting] = useState(false)
   const [resubmitted, setResubmitted] = useState(false)
+  const [expandedRow, setExpandedRow] = useState(null)
 
   const errorCount = entry.count > 1 ? Math.ceil(entry.count * 0.15) : 1
-  const allFixed = rows.every(r => r.empId && r.name && r.email && r.dob)
+  const allFixed = rows.every(r => r.empId && r.name && r.email && r.dob && r.department && r.designation)
 
   const updateRow = (id, field, value) => {
     setRows(prev => prev.map(r => r.id === id ? { ...r, [field]: value } : r))
+  }
+
+  const updateDependent = (rowId, depIdx, field, value) => {
+    setRows(prev => prev.map(r => {
+      if (r.id !== rowId) return r
+      const deps = [...(r.dependents || [])]
+      deps[depIdx] = { ...deps[depIdx], [field]: value }
+      return { ...r, dependents: deps }
+    }))
+  }
+
+  const addDependentToRow = (rowId) => {
+    setRows(prev => prev.map(r => r.id !== rowId ? r : { ...r, dependents: [...(r.dependents || []), { name: '', relation: '', dob: '' }] }))
+  }
+
+  const removeDependentFromRow = (rowId, depIdx) => {
+    setRows(prev => prev.map(r => {
+      if (r.id !== rowId) return r
+      const deps = (r.dependents || []).filter((_, i) => i !== depIdx)
+      return { ...r, dependents: deps }
+    }))
   }
 
   const handleResubmit = () => {
@@ -510,6 +576,8 @@ function BulkErrorModal({ entry, onClose }) {
       updateEntry(entry.id, { status: 'Success' })
     }, 1500)
   }
+
+  const rowHasErrors = (r) => !r.empId || !r.name || !r.email || !r.dob || !r.department || !r.designation
 
   if (resubmitted) {
     return (
@@ -532,7 +600,7 @@ function BulkErrorModal({ entry, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl mx-4 overflow-hidden max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 overflow-hidden max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center">
@@ -562,14 +630,14 @@ function BulkErrorModal({ entry, onClose }) {
 
               <div className="flex gap-3">
                 <button
-                  onClick={() => setMode('fix')}
+                  onClick={() => { setMode('fix'); setExpandedRow(rows[0]?.id) }}
                   className="flex-1 p-4 bg-white border-2 border-indigo-200 rounded-xl hover:border-indigo-400 hover:bg-indigo-50/30 transition-all cursor-pointer text-left"
                 >
                   <div className="flex items-center gap-2.5 mb-1.5">
                     <Pencil size={16} className="text-indigo-600" />
                     <p className="text-sm font-semibold text-gray-900">Fix Inline</p>
                   </div>
-                  <p className="text-xs text-gray-500">Correct the errors directly in the table and resubmit</p>
+                  <p className="text-xs text-gray-500">Correct all fields including plans and dependents, then resubmit</p>
                 </button>
                 <button className="flex-1 p-4 bg-white border-2 border-gray-200 rounded-xl hover:border-gray-300 transition-all cursor-pointer text-left">
                   <div className="flex items-center gap-2.5 mb-1.5">
@@ -597,63 +665,120 @@ function BulkErrorModal({ entry, onClose }) {
                 <button onClick={() => setMode('summary')} className="text-xs text-indigo-600 font-medium hover:text-indigo-700 cursor-pointer inline-flex items-center gap-1">
                   <ChevronLeft size={14} /> Back to summary
                 </button>
-                <p className="text-xs text-gray-500">{rows.length} rows to fix</p>
+                <p className="text-xs text-gray-500">{rows.length} employees to fix &middot; click to expand</p>
               </div>
 
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Emp ID</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">DOB</th>
-                        <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[120px]">Error</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {rows.map(row => (
-                        <tr key={row.id}>
-                          <td className="px-3 py-2">
-                            <input
-                              value={row.empId}
-                              onChange={e => updateRow(row.id, 'empId', e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded-md ${!row.empId ? 'border-red-300 bg-red-50/40' : 'border-gray-200'}`}
-                              placeholder="EMP..."
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              value={row.name}
-                              onChange={e => updateRow(row.id, 'name', e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded-md ${!row.name ? 'border-red-300 bg-red-50/40' : 'border-gray-200'}`}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              value={row.email}
-                              onChange={e => updateRow(row.id, 'email', e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded-md ${!row.email ? 'border-red-300 bg-red-50/40' : 'border-gray-200'}`}
-                              placeholder="email@..."
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <input
-                              type="date"
-                              value={row.dob}
-                              onChange={e => updateRow(row.id, 'dob', e.target.value)}
-                              className={`w-full px-2 py-1 text-sm border rounded-md ${!row.dob ? 'border-red-300 bg-red-50/40' : 'border-gray-200'}`}
-                            />
-                          </td>
-                          <td className="px-3 py-2">
-                            <span className="text-xs text-red-600">{row.error}</span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+              <div className="space-y-3">
+                {rows.map(row => {
+                  const isOpen = expandedRow === row.id
+                  const hasErr = rowHasErrors(row)
+                  return (
+                    <div key={row.id} className={`border rounded-xl overflow-hidden transition-all ${isOpen ? 'border-indigo-300 ring-1 ring-indigo-100' : hasErr ? 'border-red-200' : 'border-emerald-200'}`}>
+                      <button
+                        onClick={() => setExpandedRow(isOpen ? null : row.id)}
+                        className={`w-full flex items-center justify-between px-4 py-3 text-left cursor-pointer transition-colors ${isOpen ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${hasErr ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                            {hasErr ? <AlertCircle size={16} className="text-red-500" /> : <CheckCircle2 size={16} className="text-emerald-600" />}
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-900">{row.name || 'Unnamed'} <span className="text-xs text-gray-400 font-normal">{row.empId}</span></p>
+                            <p className="text-xs text-gray-500">{row.department || '—'} &middot; {row.designation || '—'}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {(row.dependents || []).length > 0 && (
+                            <span className="text-[10px] font-medium text-violet-600 bg-violet-50 border border-violet-200 px-1.5 py-0.5 rounded-full">{(row.dependents || []).length} dep{(row.dependents || []).length > 1 ? 's' : ''}</span>
+                          )}
+                          {hasErr && (row.errors?.length > 0) && <span className="text-[10px] font-medium text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full">{row.errors.length} error{row.errors.length > 1 ? 's' : ''}</span>}
+                          {isOpen ? <ChevronUp size={18} className="text-gray-400" /> : <ChevronDown size={18} className="text-gray-400" />}
+                        </div>
+                      </button>
+
+                      {isOpen && (
+                        <div className="border-t border-gray-100 px-4 py-4 space-y-4">
+                          <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100/60">
+                            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Basic Information</p>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-x-4 gap-y-3">
+                              <BulkField label="Full Name" required value={row.name} error={!row.name} onChange={v => updateRow(row.id, 'name', v)} placeholder="Full name" />
+                              <BulkField label="Employee ID" required value={row.empId} error={!row.empId} onChange={v => updateRow(row.id, 'empId', v)} placeholder="EMP..." />
+                              <BulkField label="Email" required value={row.email} error={!row.email} onChange={v => updateRow(row.id, 'email', v)} placeholder="email@acko.com" />
+                              <BulkField label="Date of Birth" required type="date" value={row.dob} error={!row.dob} onChange={v => updateRow(row.id, 'dob', v)} />
+                              <BulkField label="Mobile" value={row.mobile} onChange={v => updateRow(row.id, 'mobile', v)} placeholder="9876543210" />
+                              <BulkField label="Gender" value={row.gender} onChange={v => updateRow(row.id, 'gender', v)} placeholder="Male / Female" />
+                              <BulkField label="Department" required value={row.department} error={!row.department} onChange={v => updateRow(row.id, 'department', v)} placeholder="Department" />
+                              <BulkField label="Designation" required value={row.designation} error={!row.designation} onChange={v => updateRow(row.id, 'designation', v)} placeholder="Designation" />
+                              <BulkField label="Date of Joining" type="date" value={row.doj} onChange={v => updateRow(row.id, 'doj', v)} />
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100/60">
+                            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Insurance Plans</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Heart size={13} className="text-blue-600" />
+                                  <span className="text-xs font-semibold text-gray-900">GMC</span>
+                                </div>
+                                <select value={row.gmcBase} onChange={e => updateRow(row.id, 'gmcBase', e.target.value)} className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
+                                  <option value="">Select GMC plan</option>
+                                  {basePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                              <div className="bg-white rounded-lg border border-gray-200 p-3">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Shield size={13} className="text-violet-600" />
+                                  <span className="text-xs font-semibold text-gray-900">GPA</span>
+                                </div>
+                                <select value={row.gpaBase} onChange={e => updateRow(row.id, 'gpaBase', e.target.value)} className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
+                                  <option value="">Select GPA plan</option>
+                                  {gpaBasePlans.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                                </select>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="bg-amber-50/40 rounded-xl p-4 border border-amber-100/60">
+                            <div className="flex items-center justify-between mb-3">
+                              <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider">Dependents ({(row.dependents || []).length})</p>
+                              <button type="button" onClick={() => addDependentToRow(row.id)} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 cursor-pointer">
+                                <Plus size={12} /> Add dependent
+                              </button>
+                            </div>
+                            {(row.dependents || []).length === 0 ? (
+                              <p className="text-xs text-gray-500 py-2">No dependents. Click &quot;Add dependent&quot; to add one.</p>
+                            ) : (
+                              <div className="space-y-3">
+                                {(row.dependents || []).map((dep, di) => (
+                                  <div key={di} className="bg-white rounded-lg border border-gray-200 p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[11px] font-semibold text-gray-500">Dependent {di + 1}</span>
+                                      <button type="button" onClick={() => removeDependentFromRow(row.id, di)} className="p-1 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded cursor-pointer">
+                                        <Trash2 size={12} />
+                                      </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                      <BulkField label="Name" value={dep.name} onChange={v => updateDependent(row.id, di, 'name', v)} placeholder="Dependent name" />
+                                      <div>
+                                        <label className="block text-[11px] font-medium text-gray-500 mb-1">Relation</label>
+                                        <select value={dep.relation || ''} onChange={e => updateDependent(row.id, di, 'relation', e.target.value)} className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white">
+                                          <option value="">Select relation</option>
+                                          {dependentRelations.map(rel => <option key={rel} value={rel}>{rel}</option>)}
+                                        </select>
+                                      </div>
+                                      <BulkField label="Date of Birth" type="date" value={dep.dob} onChange={v => updateDependent(row.id, di, 'dob', v)} />
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </>
           )}
@@ -671,8 +796,8 @@ function BulkErrorModal({ entry, onClose }) {
             <>
               <p className="text-xs text-gray-500">
                 {allFixed
-                  ? <span className="text-emerald-600 font-medium">All errors resolved</span>
-                  : 'Fix all highlighted fields to resubmit'}
+                  ? <span className="text-emerald-600 font-medium flex items-center gap-1"><CheckCircle2 size={12} /> All errors resolved</span>
+                  : `${rows.filter(r => !rowHasErrors(r)).length}/${rows.length} employees fixed`}
               </p>
               <button
                 onClick={handleResubmit}
@@ -686,6 +811,16 @@ function BulkErrorModal({ entry, onClose }) {
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+function BulkField({ label, type = 'text', required, value, onChange, placeholder, error }) {
+  return (
+    <div>
+      <label className="block text-[11px] font-medium text-gray-500 mb-1">{label} {required && <span className="text-red-400">*</span>}</label>
+      <input type={type} value={value || ''} onChange={e => onChange(e.target.value)} placeholder={placeholder}
+        className={`w-full px-2.5 py-1.5 text-sm border rounded-lg bg-white transition-all ${error ? 'border-red-300 bg-red-50/30 ring-1 ring-red-200' : value ? 'border-emerald-300 bg-emerald-50/20' : 'border-gray-200'}`} />
     </div>
   )
 }

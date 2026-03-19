@@ -67,7 +67,10 @@ export default function AddDependents() {
             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center"><User size={18} className="text-indigo-600" /></div>
             <div><p className="text-sm font-semibold text-gray-900">{selectedEmployee.name}</p><p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.department}</p></div>
           </div>
-          <DependentForm dependents={dependents} onChange={setDependents} />
+          <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Dependent Details</p>
+            <DependentForm dependents={dependents} onChange={setDependents} />
+          </div>
           <div className="flex justify-end mt-5">
             <button onClick={() => { addEntry({ action: 'Add Dependents', count: dependents.length, status: 'Success', type: 'quick' }); setSubmitted(true); setTimeout(() => navigate('/'), 2000) }} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><CheckCircle size={16} /> Submit</button>
           </div>

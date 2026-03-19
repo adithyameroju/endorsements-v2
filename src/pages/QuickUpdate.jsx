@@ -70,7 +70,7 @@ export default function QuickUpdate() {
   return (
     <div className="flex flex-col h-full px-6 lg:px-8 py-6">
       <div className="flex-shrink-0">
-        <PageHeader title="Quick Update" subtitle="Search for an employee and update their details" breadcrumbs={[{ label: 'Update Employee', path: '/update' }, { label: 'Quick Update' }]} />
+        <PageHeader title="Quick Update" subtitle="Search for an employee — update details or add dependents" breadcrumbs={[{ label: 'Update Employee', path: '/update' }, { label: 'Quick Update' }]} />
         <Stepper steps={['Search Employee', 'Edit Details', 'Submit']} currentStep={selectedEmployee ? (submitted ? 3 : 2) : 1} />
 
         <div className="relative mb-5">
@@ -114,8 +114,8 @@ export default function QuickUpdate() {
 
       {formData && (
         <div className="flex-1 min-h-0 bg-white border border-gray-200 rounded-xl flex flex-col overflow-hidden">
-          <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            <section>
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2.5">
                 <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-bold text-indigo-600">1</div>
                 Employee Details
@@ -133,9 +133,7 @@ export default function QuickUpdate() {
               </div>
             </section>
 
-            <hr className="border-gray-100" />
-
-            <section>
+            <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2.5">
                 <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-bold text-indigo-600">2</div>
                 Insurance Plans
@@ -143,14 +141,12 @@ export default function QuickUpdate() {
               <PlanSelection plans={formData.plans} onChange={(plans) => updateField('plans', plans)} label="update-emp" />
             </section>
 
-            <hr className="border-gray-100" />
-
-            <section>
+            <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
               <h3 className="text-sm font-semibold text-gray-900 mb-4 flex items-center gap-2.5">
                 <div className="w-6 h-6 bg-indigo-100 rounded-full flex items-center justify-center text-xs font-bold text-indigo-600">3</div>
                 Dependents
               </h3>
-              <DependentForm dependents={formData.dependents} onChange={(deps) => updateField('dependents', deps)} />
+              <DependentForm dependents={formData.dependents} onChange={(deps) => updateField('dependents', deps)} employeePlans={formData.plans} />
             </section>
           </div>
 

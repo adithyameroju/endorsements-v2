@@ -4,7 +4,7 @@ import { Search, User, CheckCircle } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
-import { mockEmployees } from '../data/mockData'
+import { mockEmployees, basePlans, secondaryPlans, addonPlans, gpaBasePlans } from '../data/mockData'
 import { useEndorsements } from '../store/EndorsementStore'
 
 export default function LifeEventSpouse() {
@@ -13,7 +13,16 @@ export default function LifeEventSpouse() {
   const [query, setQuery] = useState('')
   const [showResults, setShowResults] = useState(false)
   const [selectedEmployee, setSelectedEmployee] = useState(null)
-  const [spouseData, setSpouseData] = useState({ name: '', dob: '', gender: 'Female', plans: {} })
+  const [spouseData, setSpouseData] = useState({ name: '', dob: '', gender: 'Female', dateOfMarriage: '', samePlansAsEmployee: true, plans: {} })
+  
+  // Mock employee plans for demo
+  const mockEmployeePlans = {
+    gmcBasePlan: 'bp2', // Base Plan - 5L
+    gmcSecondaryPlan: 'sp1', // Secondary Plan - 2L  
+    gmcAddons: ['ap1', 'ap3'], // Dental & Vision, OPD
+    gpaBasePlan: 'gpa-bp2', // GPA Base - 10L
+    gpaSiType: 'fixed'
+  }
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState({})
 
@@ -27,10 +36,35 @@ export default function LifeEventSpouse() {
     setQuery(emp.name)
   }
 
+  const formatEmployeeGmcOnly = (plans) => {
+    const parts = []
+    const gmcBase = basePlans.find(p => p.id === plans.gmcBasePlan)
+    if (gmcBase) parts.push(`GMC: ${gmcBase.name}`)
+    
+    const gmcSecondary = secondaryPlans.find(p => p.id === plans.gmcSecondaryPlan)
+    if (gmcSecondary) parts.push(`Secondary: ${gmcSecondary.name}`)
+    
+    if (plans.gmcAddons?.length) {
+      const addons = addonPlans.filter(p => plans.gmcAddons.includes(p.id)).map(p => p.name)
+      if (addons.length) parts.push(`Add-ons: ${addons.join(', ')}`)
+    }
+    
+    return parts.join(' • ') || 'No GMC plan configured'
+  }
+
+  const setSamePlans = (same) => {
+    setSpouseData({
+      ...spouseData,
+      samePlansAsEmployee: same,
+      plans: same ? {} : { gmcBasePlan: mockEmployeePlans.gmcBasePlan || '' }
+    })
+  }
+
   const validate = () => {
     const e = {}
     if (!spouseData.name.trim()) e.name = 'Spouse name is required'
     if (!spouseData.dob) e.dob = 'Date of birth is required'
+    if (!spouseData.dateOfMarriage) e.dateOfMarriage = 'Date of marriage is required'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -72,34 +106,67 @@ export default function LifeEventSpouse() {
       </div>
 
       {selectedEmployee && (
-        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-5">
+        <div className="bg-white border border-gray-200 rounded-xl p-6 space-y-4">
           <div className="flex items-center gap-3 pb-4 border-b border-gray-100">
             <div className="w-10 h-10 bg-pink-100 rounded-full flex items-center justify-center"><User size={18} className="text-pink-600" /></div>
             <div><p className="text-sm font-semibold text-gray-900">{selectedEmployee.name}</p><p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.department}</p></div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-x-5 gap-y-4">
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Spouse Name <span className="text-red-500">*</span></label>
-              <input type="text" value={spouseData.name} onChange={e => setSpouseData({ ...spouseData, name: e.target.value })} placeholder="Full name"
-                className={`w-full px-3 py-2 text-sm border rounded-lg bg-white ${errors.name ? 'border-red-300' : 'border-gray-200'}`} />
-              {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Birth <span className="text-red-500">*</span></label>
-              <input type="date" value={spouseData.dob} onChange={e => setSpouseData({ ...spouseData, dob: e.target.value })}
-                className={`w-full px-3 py-2 text-sm border rounded-lg bg-white ${errors.dob ? 'border-red-300' : 'border-gray-200'}`} />
-              {errors.dob && <p className="text-xs text-red-500 mt-1">{errors.dob}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender</label>
-              <select value={spouseData.gender} onChange={e => setSpouseData({ ...spouseData, gender: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
-                <option>Male</option><option>Female</option><option>Other</option>
-              </select>
+          
+          {/* Employee's Current Plans */}
+          <div className="bg-blue-50/40 rounded-xl p-4 border border-blue-100/60">
+            <p className="text-xs font-semibold text-blue-700/70 uppercase tracking-wider mb-2">Employee's Current Plans</p>
+            <p className="text-sm text-gray-900">{formatEmployeeGmcOnly(mockEmployeePlans)}</p>
+          </div>
+          <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+            <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Spouse Details</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Spouse Name <span className="text-red-500">*</span></label>
+                <input type="text" value={spouseData.name} onChange={e => setSpouseData({ ...spouseData, name: e.target.value })} placeholder="Full name"
+                  className={`w-full px-3 py-2 text-sm border rounded-lg bg-white ${errors.name ? 'border-red-300' : 'border-gray-200'}`} />
+                {errors.name && <p className="text-xs text-red-500 mt-1">{errors.name}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Birth <span className="text-red-500">*</span></label>
+                <input type="date" value={spouseData.dob} onChange={e => setSpouseData({ ...spouseData, dob: e.target.value })}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg bg-white ${errors.dob ? 'border-red-300' : 'border-gray-200'}`} />
+                {errors.dob && <p className="text-xs text-red-500 mt-1">{errors.dob}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Marriage <span className="text-red-500">*</span></label>
+                <input type="date" value={spouseData.dateOfMarriage} onChange={e => setSpouseData({ ...spouseData, dateOfMarriage: e.target.value })}
+                  className={`w-full px-3 py-2 text-sm border rounded-lg bg-white ${errors.dateOfMarriage ? 'border-red-300' : 'border-gray-200'}`} />
+                {errors.dateOfMarriage && <p className="text-xs text-red-500 mt-1">{errors.dateOfMarriage}</p>}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender</label>
+                <select value={spouseData.gender} onChange={e => setSpouseData({ ...spouseData, gender: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white">
+                  <option>Male</option><option>Female</option><option>Other</option>
+                </select>
+              </div>
             </div>
           </div>
-          <div>
-            <h4 className="text-sm font-semibold text-gray-900 mb-3">Spouse Insurance Plans</h4>
-            <PlanSelection plans={spouseData.plans} onChange={plans => setSpouseData({ ...spouseData, plans })} label="spouse" />
+          <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider">Spouse Insurance Plans</p>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={spouseData.samePlansAsEmployee}
+                  onChange={e => setSamePlans(e.target.checked)}
+                  className="accent-indigo-600 w-4 h-4 rounded"
+                />
+                <span className="text-xs font-medium text-gray-700">Same as employee</span>
+              </label>
+            </div>
+            {spouseData.samePlansAsEmployee ? (
+              <div className="px-4 py-3 bg-gray-50 rounded-xl border border-gray-100">
+                <p className="text-xs text-gray-500 mb-1">Same as employee (view only)</p>
+                <p className="text-sm font-medium text-gray-900">{formatEmployeeGmcOnly(mockEmployeePlans)}</p>
+              </div>
+            ) : (
+              <PlanSelection plans={spouseData.plans} onChange={plans => setSpouseData({ ...spouseData, plans })} label="spouse" />
+            )}
           </div>
           <div className="flex justify-end pt-3">
             <button onClick={handleSubmit} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><CheckCircle size={16} /> Submit</button>

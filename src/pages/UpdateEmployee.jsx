@@ -1,11 +1,10 @@
 import { useNavigate } from 'react-router-dom'
-import { Pencil, Upload, UserPlus, Heart, Baby, ArrowRight } from 'lucide-react'
+import { Pencil, Upload, Heart, Baby, ArrowRight } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 
 const primaryOptions = [
-  { title: 'Quick Update', description: 'Search and update individual employee details', icon: Pencil, color: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-300', path: '/update/quick' },
+  { title: 'Quick Update', description: 'Update employee details or add dependents', icon: Pencil, color: 'bg-blue-50 text-blue-600', border: 'border-blue-200 hover:border-blue-300', path: '/update/quick' },
   { title: 'Bulk Update', description: 'Upload Excel to update multiple employees', icon: Upload, color: 'bg-teal-50 text-teal-600', border: 'border-teal-200 hover:border-teal-300', path: '/update/bulk' },
-  { title: 'Add Dependents', description: 'Add dependents to an existing employee', icon: UserPlus, color: 'bg-violet-50 text-violet-600', border: 'border-violet-200 hover:border-violet-300', path: '/update/add-dependents' },
 ]
 
 const lifeEvents = [
@@ -24,7 +23,7 @@ export default function UpdateEmployee() {
         breadcrumbs={[{ label: 'Update Employee' }]}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 max-w-4xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 max-w-2xl">
         {primaryOptions.map((opt) => <Card key={opt.title} opt={opt} onClick={() => navigate(opt.path)} />)}
       </div>
 

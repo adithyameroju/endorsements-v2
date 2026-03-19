@@ -1,17 +1,18 @@
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, ChevronRight, Home } from 'lucide-react'
 
-export default function PageHeader({ title, subtitle, breadcrumbs = [], backPath, backLabel }) {
+export default function PageHeader({ title, subtitle, breadcrumbs = [], backPath, backLabel, trailing, navTrailing }) {
   const navigate = useNavigate()
 
   const resolvedBackPath = backPath || deriveBackPath(breadcrumbs)
   const resolvedBackLabel = backLabel || deriveBackLabel(breadcrumbs)
-  const showNav = resolvedBackPath || breadcrumbs.length > 0
+  const showNav = resolvedBackPath || breadcrumbs.length > 0 || navTrailing
 
   return (
     <div className="mb-6">
       {showNav && (
-        <nav className="flex items-center gap-0 text-sm mb-3">
+        <nav className="flex items-center justify-between gap-2 text-sm mb-3">
+          <div className="flex items-center gap-0 min-w-0">
           {resolvedBackPath && (
             <>
               <button
@@ -48,10 +49,17 @@ export default function PageHeader({ title, subtitle, breadcrumbs = [], backPath
               </span>
             ))}
           </div>
+          </div>
+          {navTrailing && <div className="flex-shrink-0">{navTrailing}</div>}
         </nav>
       )}
-      <h1 className="text-xl font-bold text-gray-900 leading-tight">{title}</h1>
-      {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-gray-900 leading-tight">{title}</h1>
+          {subtitle && <p className="text-sm text-gray-500 mt-0.5">{subtitle}</p>}
+        </div>
+        {trailing && <div className="flex-shrink-0">{trailing}</div>}
+      </div>
     </div>
   )
 }

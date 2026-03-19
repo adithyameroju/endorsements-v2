@@ -1,8 +1,8 @@
 import { Check } from 'lucide-react'
 
-export default function Stepper({ steps, currentStep }) {
+export default function Stepper({ steps, currentStep, compact }) {
   return (
-    <nav className="flex items-center gap-1 mb-6">
+    <nav className={`flex items-center gap-1 ${compact ? 'mb-1' : 'mb-6'}`}>
       {steps.map((label, i) => {
         const stepNum = i + 1
         const isCompleted = stepNum < currentStep

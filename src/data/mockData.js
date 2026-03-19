@@ -1,16 +1,25 @@
 export const endorsementHistory = [
   { id: 1, date: '2026-03-10', action: 'Add Employee', doneBy: 'Adithya M.', status: 'Success', count: 3, type: 'quick', details: [{ name: 'Rohit Mehra', id: 'EMP021', department: 'Engineering', designation: 'Software Engineer' }, { name: 'Tanya Bose', id: 'EMP022', department: 'Product', designation: 'Associate' }, { name: 'Nikhil Jain', id: 'EMP023', department: 'Design', designation: 'Designer' }] },
   { id: 2, date: '2026-03-09', action: 'Bulk Upload - Add', doneBy: 'Priya S.', status: 'Failed', count: 12, type: 'bulk' },
-  { id: 16, date: '2026-03-09', action: 'Add Employee - Deepak Mishra', doneBy: 'Adithya M.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Deepak Mishra', id: 'EMP024', department: 'Finance', designation: 'Analyst' }] },
-  { id: 17, date: '2026-03-08', action: 'Add Employee - Kavya Nair', doneBy: 'Priya S.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Kavya Nair', id: 'EMP025', department: 'HR', designation: 'Manager' }] },
+  { id: 21, date: '2026-03-10', action: 'Add Employees - Batch', doneBy: 'Adithya M.', status: 'Failed', count: 2, type: 'quick', details: [
+    { name: 'Ravi Shankar', id: 'EMP030', department: 'Engineering', designation: '', email: 'ravi.s@acko.com', dob: '', mobile: '9876500020', gender: 'Male', doj: '2026-03-12', gmcBase: '', gpaBase: '' },
+    { name: '', id: 'EMP031', department: '', designation: 'Associate', email: '', dob: '1994-09-14', mobile: '9876500021', gender: 'Female', doj: '2026-03-12', gmcBase: '', gpaBase: '' },
+  ]},
+  { id: 22, date: '2026-03-09', action: 'Add Employees - Batch', doneBy: 'Priya S.', status: 'Failed', count: 3, type: 'quick', details: [
+    { name: 'Neha Kapoor', id: 'EMP032', department: 'Marketing', designation: 'Manager', email: 'neha.k@acko.com', dob: '1990-03-22', mobile: '98765abc', gender: 'Female', doj: '2026-03-18', gmcBase: '', gpaBase: '' },
+    { name: 'Tarun Mehta', id: '', department: 'Sales', designation: 'Senior Manager', email: 'tarun.m@acko.com', dob: '1987-12-01', mobile: '9876500023', gender: 'Male', doj: '', gmcBase: '', gpaBase: '' },
+    { name: 'Anita Verma', id: 'EMP034', department: 'HR', designation: 'Associate', email: '', dob: '', mobile: '9876500024', gender: 'Female', doj: '2026-03-20', gmcBase: '', gpaBase: '' },
+  ]},
+  { id: 16, date: '2026-03-09', action: 'Add Employee - Deepak Mishra', doneBy: 'Adithya M.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Deepak Mishra', id: 'EMP024', department: 'Finance', designation: 'Analyst', email: '', dob: '1992-04-10', mobile: '9876500011', gender: 'Male', doj: '2026-03-15', gmcBase: '', gpaBase: '' }] },
+  { id: 17, date: '2026-03-08', action: 'Add Employee - Kavya Nair', doneBy: 'Priya S.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Kavya Nair', id: 'EMP025', department: 'HR', designation: '', email: 'kavya.n@acko.com', dob: '', mobile: '9876500012', gender: 'Female', doj: '2026-03-20', gmcBase: '', gpaBase: '' }] },
   { id: 3, date: '2026-03-08', action: 'Delete Employee', doneBy: 'Adithya M.', status: 'Success', count: 1, type: 'quick' },
-  { id: 18, date: '2026-03-07', action: 'Add Employee - Amit Sinha', doneBy: 'Rahul K.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Amit Sinha', id: 'EMP026', department: 'Sales', designation: 'Senior Manager' }] },
+  { id: 18, date: '2026-03-07', action: 'Add Employee - Amit Sinha', doneBy: 'Rahul K.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Amit Sinha', id: '', department: 'Sales', designation: 'Senior Manager', email: 'amit.s@acko.com', dob: '1988-11-05', mobile: '98765abc', gender: 'Male', doj: '2026-03-10', gmcBase: '', gpaBase: '' }] },
   { id: 4, date: '2026-03-07', action: 'Update Employee', doneBy: 'Rahul K.', status: 'Success', count: 5, type: 'quick' },
   { id: 5, date: '2026-03-06', action: 'HRMS Sync', doneBy: 'System', status: 'Success', count: 8, type: 'sync' },
-  { id: 19, date: '2026-03-06', action: 'Add Employee - Pooja Rao', doneBy: 'Adithya M.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Pooja Rao', id: 'EMP027', department: 'Marketing', designation: 'Associate' }] },
+  { id: 19, date: '2026-03-06', action: 'Add Employee - Pooja Rao', doneBy: 'Adithya M.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Pooja Rao', id: 'EMP027', department: '', designation: 'Associate', email: 'pooja.r@acko.com', dob: '1996-02-18', mobile: '9876500014', gender: 'Female', doj: '', gmcBase: '', gpaBase: '' }] },
   { id: 6, date: '2026-03-05', action: 'Bulk Upload - Delete', doneBy: 'Priya S.', status: 'Success', count: 4, type: 'bulk' },
   { id: 7, date: '2026-03-04', action: 'Add Employee', doneBy: 'Adithya M.', status: 'Success', count: 2, type: 'quick' },
-  { id: 20, date: '2026-03-04', action: 'Add Employee - Siddharth Pillai', doneBy: 'Priya S.', status: 'Failed', count: 1, type: 'quick', details: [{ name: 'Siddharth Pillai', id: 'EMP028', department: 'Engineering', designation: 'Staff Engineer' }] },
+  { id: 20, date: '2026-03-04', action: 'Add Employee - Siddharth Pillai', doneBy: 'Priya S.', status: 'Failed', count: 1, type: 'quick', details: [{ name: '', id: 'EMP028', department: 'Engineering', designation: 'Staff Engineer', email: 'sid.p@acko.com', dob: '1991-07-22', mobile: '9876500015', gender: 'Male', doj: '2026-03-01', gmcBase: '', gpaBase: '' }] },
   { id: 8, date: '2026-03-03', action: 'HRMS Sync', doneBy: 'System', status: 'Failed', count: 15, type: 'sync' },
   { id: 9, date: '2026-03-02', action: 'Bulk Upload - Update', doneBy: 'Rahul K.', status: 'Success', count: 20, type: 'bulk' },
   { id: 10, date: '2026-03-01', action: 'Add Employee', doneBy: 'Priya S.', status: 'Success', count: 1, type: 'quick' },
@@ -64,6 +73,15 @@ export const designations = [
 export const dependentRelations = [
   'Spouse', 'Father', 'Mother', 'Father-in-law', 'Mother-in-law',
   'Son', 'Daughter', 'Brother', 'Sister'
+]
+
+/** Grouped for chip UI: Spouse, Children, Parents, In-laws, Siblings */
+export const dependentRelationGroups = [
+  { label: 'Spouse', relations: ['Spouse'] },
+  { label: 'Children', relations: ['Son', 'Daughter'] },
+  { label: 'Parents', relations: ['Father', 'Mother'] },
+  { label: 'In-laws', relations: ['Father-in-law', 'Mother-in-law'] },
+  { label: 'Siblings', relations: ['Brother', 'Sister'] },
 ]
 
 export const mockEmployees = [
