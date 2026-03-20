@@ -38,26 +38,35 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
   }
 
   return (
-    <div className={gmcOnly ? '' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
-      {/* GMC Section */}
-      <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-900">Insurance Plans <span className="text-red-500">*</span></h3>
+        <p className="text-xs text-gray-500">Toggle on the plans you want to enroll this employee in</p>
+      </div>
+      
+      <div className={gmcOnly ? '' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
+        {/* GMC Section */}
+        <div className="space-y-4">
         {/* GMC Toggle Header */}
         <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-white">
           <div className="flex items-center gap-2.5">
-            <Heart size={16} className="text-blue-600" />
+            <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+              <Heart size={16} className="text-blue-600" />
+            </div>
             <div>
               <span className="text-sm font-semibold text-gray-900">GMC</span>
-              <p className="text-xs text-gray-500">Group Mediclaim</p>
+              <p className="text-xs text-gray-500">Comprehensive medical insurance for hospitalization, OPD & more</p>
             </div>
           </div>
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="relative inline-flex items-center cursor-pointer">
             <input
               type="checkbox"
               checked={gmcEnabled}
               onChange={e => toggleGMC(e.target.checked)}
-              className="accent-blue-600 w-4 h-4 rounded"
+              className="sr-only peer"
             />
-            <span className="text-xs font-medium text-gray-700">Enable</span>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
           </label>
         </div>
 
@@ -146,20 +155,22 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
           {/* GPA Toggle Header */}
           <div className="flex items-center justify-between p-4 border border-gray-200 rounded-xl bg-white">
             <div className="flex items-center gap-2.5">
-              <Shield size={16} className="text-violet-600" />
+              <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
+                <Shield size={16} className="text-red-600" />
+              </div>
               <div>
                 <span className="text-sm font-semibold text-gray-900">GPA</span>
-                <p className="text-xs text-gray-500">Group Personal Accident</p>
+                <p className="text-xs text-gray-500">Accidental death and disability coverage</p>
               </div>
             </div>
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
                 checked={gpaEnabled}
                 onChange={e => toggleGPA(e.target.checked)}
-                className="accent-violet-600 w-4 h-4 rounded"
+                className="sr-only peer"
               />
-              <span className="text-xs font-medium text-gray-700">Enable</span>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
             </label>
           </div>
 
@@ -243,6 +254,7 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
