@@ -11,7 +11,8 @@ Cursor cannot push files under `.github/workflows/` for you (GitHub blocks it). 
    `.github/workflows/deploy-github-pages.yml`  
    GitHub will create the folders for you.
 
-3. **Open** the file [`docs/deploy-github-pages.yml`](docs/deploy-github-pages.yml) in this project, **select all**, **copy**, and **paste** into the GitHub editor.
+3. **Copy the workflow YAML:** open **[raw file on GitHub](https://raw.githubusercontent.com/adithyameroju/endorsements-v2/main/docs/deploy-github-pages.yml)** (Cmd+A, Cmd+C), then **paste** into the GitHub editor.  
+   Or open [`docs/deploy-github-pages.yml`](docs/deploy-github-pages.yml) locally and copy the whole file.
 
 4. Click **Commit changes** (green button), leave default message, confirm **Commit directly to `main`**.
 
