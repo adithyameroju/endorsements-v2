@@ -35,6 +35,13 @@ Open **http://127.0.0.1:4173/**
 
 ## Live demo (GitHub Pages)
 
-https://adithya.meroju.github.io/endorsements-v2/
+**https://adithyameroju.github.io/endorsements-v2/#/**
 
-Production builds use **relative** asset paths (`./assets/...`) so the site works in that subfolder.
+Production builds use **relative** asset paths (`base: './'` in Vite) so the site works under `/endorsements-v2/`.  
+Routes use **HashRouter** (`#/…`) so refreshes work on GitHub Pages.
+
+### Automatic deploy
+
+Pushes to **`main`** run the workflow **Deploy to GitHub Pages** (same YAML as [`docs/deploy-github-pages.yml`](docs/deploy-github-pages.yml)).
+
+**One-time:** **Settings → Pages → Source → GitHub Actions**. If the workflow file is not in the repo yet, follow **[`ADD_WORKFLOW_IN_BROWSER.md`](ADD_WORKFLOW_IN_BROWSER.md)** (copy-paste in the browser — no terminal). After the first green **Actions** run, each push updates the live site.
