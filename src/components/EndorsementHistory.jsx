@@ -237,7 +237,7 @@ function ProgressModal({ entry, onClose }) {
       updateEntry(entry.id, { status: 'Success' })
     }, 4500)
     return () => { clearTimeout(t1); clearTimeout(t2); clearTimeout(t3) }
-  }, [entry.id])
+  }, [entry.id, updateEntry])
 
   const isDone = progress === 100
 

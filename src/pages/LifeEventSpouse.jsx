@@ -4,7 +4,7 @@ import { Search, User, CheckCircle } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
-import { mockEmployees, basePlans, secondaryPlans, addonPlans, gpaBasePlans } from '../data/mockData'
+import { mockEmployees, basePlans, secondaryPlans, addonPlans } from '../data/mockData'
 import { useEndorsements } from '../store/EndorsementStore'
 
 export default function LifeEventSpouse() {
@@ -165,7 +165,7 @@ export default function LifeEventSpouse() {
                 <p className="text-sm font-medium text-gray-900">{formatEmployeeGmcOnly(mockEmployeePlans)}</p>
               </div>
             ) : (
-              <PlanSelection plans={spouseData.plans} onChange={plans => setSpouseData({ ...spouseData, plans })} label="spouse" />
+              <PlanSelection plans={spouseData.plans} onChange={plans => setSpouseData({ ...spouseData, plans })} label="spouse" hideInsuranceHeader />
             )}
           </div>
           <div className="flex justify-end pt-3">

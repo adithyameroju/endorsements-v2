@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronLeft, Eye, CheckCircle, User, Trash2, ChevronUp, AlertCircle, UserPlus, Heart, Users, Sparkles, X, Shield } from 'lucide-react'
+import { Plus, ChevronDown, ChevronLeft, Eye, CheckCircle, User, Trash2, ChevronUp, AlertCircle, Heart, Users, Sparkles, X, Shield, Wallet, Info } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
 import DependentForm from '../components/DependentForm'
-import { departments, designations, basePlans, secondaryPlans, addonPlans, topupPlans, gpaBasePlans } from '../data/mockData'
+import { departments, designations, basePlans, gpaBasePlans } from '../data/mockData'
+import { cloneEmployeeGmcPlans } from '../lib/planHelpers'
+import { formatInr, formatInrSigned } from '../lib/currencyFormat'
 import { useEndorsements } from '../store/EndorsementStore'
+import PremiumEstimateLivePanel from '../components/PremiumEstimateLivePanel'
 
 const emptyEmployee = () => ({
   id: Date.now(),
@@ -50,6 +53,110 @@ function fieldCount(emp) {
   return requiredFields.filter(f => emp[f] && String(emp[f]).trim()).length
 }
 
+/** Replace with API / context in production */
+const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
+/** Illustrative policy context for Premium Estimate header */
+const MOCK_POLICY_DAYS_LEFT = 9
+
+const CD_DISPLAY_MODE_STORAGE_KEY = 'quickAdd_cdDisplayMode'
+const CD_LIVE_PANEL_OPEN_KEY = 'quickAdd_cdLivePanelOpen'
+
+function readStoredCdDisplayMode() {
+  try {
+    const v = sessionStorage.getItem(CD_DISPLAY_MODE_STORAGE_KEY)
+    if (v === 'side_panel' || v === 'bottom_strip') return v
+  } catch {
+    /* private mode / unavailable */
+  }
+  return 'bottom_strip'
+}
+
+function readStoredCdLivePanelOpen() {
+  try {
+    return sessionStorage.getItem(CD_LIVE_PANEL_OPEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+const CD_EST_PRIMARY_COMPLETE_RUPEES = 42_000
+const CD_EST_PRIMARY_PARTIAL_RUPEES = 18_000
+const CD_EST_PER_DEPENDENT_RUPEES = 14_000
+const CD_EST_SECONDARY_BUMP_RUPEES = 6_000
+
+/**
+ * Single pass: totals must match prior estimateCdDrawRupees behavior.
+ * @returns {{ total: number, lines: { id: string, label: string, amount: number }[] }}
+ */
+function estimateCdDrawBreakdown(employees) {
+  let primaryTotal = 0
+  let dependentLives = 0
+  let dependentTotal = 0
+  let secondaryTotal = 0
+
+  for (const emp of employees) {
+    if (isBasicComplete(emp)) {
+      primaryTotal += CD_EST_PRIMARY_COMPLETE_RUPEES
+    } else if (isFilled(emp)) {
+      primaryTotal += CD_EST_PRIMARY_PARTIAL_RUPEES
+    }
+    const dc = emp.dependents?.length || 0
+    dependentLives += dc
+    dependentTotal += dc * CD_EST_PER_DEPENDENT_RUPEES
+    if (emp.plans?.gmcSecondaryPlan && emp.plans.gmcSecondaryPlan !== 'none') {
+      secondaryTotal += CD_EST_SECONDARY_BUMP_RUPEES
+    }
+  }
+
+  const total = primaryTotal + dependentTotal + secondaryTotal
+
+  const lines = []
+  if (primaryTotal > 0) {
+    lines.push({ id: 'primary', label: 'Primary (employees)', amount: primaryTotal })
+  }
+  if (dependentTotal > 0) {
+    lines.push({
+      id: 'dependents',
+      label: `Dependents (${dependentLives} ${dependentLives === 1 ? 'life' : 'lives'})`,
+      amount: dependentTotal,
+    })
+  }
+  if (secondaryTotal > 0) {
+    lines.push({ id: 'secondary', label: 'Secondary GMC', amount: secondaryTotal })
+  }
+  lines.push({ id: 'total', label: 'Est. total (batch)', amount: total })
+
+  return { total, lines }
+}
+
+function CdBreakdownPopoverBody({ lines }) {
+  const detailLines = lines.filter((l) => l.id !== 'total')
+  const totalLine = lines.find((l) => l.id === 'total')
+  return (
+    <>
+      <p className="text-[11px] font-semibold text-gray-800 border-b border-gray-100 pb-2 mb-2">Premium estimate (est.)</p>
+      {detailLines.length > 0 ? (
+        <ul className="space-y-1.5">
+          {detailLines.map((l) => (
+            <li key={l.id} className="flex justify-between gap-4 text-[11px] text-gray-600">
+              <span>{l.label}</span>
+              <span className="tabular-nums font-medium text-gray-900">{formatInr(l.amount)}</span>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="text-[11px] text-gray-500">No line items yet — add employees or dependents to see breakdown.</p>
+      )}
+      {totalLine && (
+        <div className="flex justify-between gap-4 pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-900">
+          <span>{totalLine.label}</span>
+          <span className="tabular-nums text-indigo-700">{formatInr(totalLine.amount)}</span>
+        </div>
+      )}
+    </>
+  )
+}
+
 export default function QuickAdd() {
   const navigate = useNavigate()
   const { addEntry } = useEndorsements()
@@ -59,6 +166,125 @@ export default function QuickAdd() {
   const [touchedMap, setTouchedMap] = useState({})
   const [uiVariation, setUiVariation] = useState('variation2')
   const [activeTab, setActiveTab] = useState(0)
+  const [cdDisplayMode, setCdDisplayMode] = useState(readStoredCdDisplayMode)
+  const [isLgViewport, setIsLgViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
+  )
+  const [cdLivePanelOpen, setCdLivePanelOpen] = useState(readStoredCdLivePanelOpen)
+  const [cdBreakdownOpen, setCdBreakdownOpen] = useState(false)
+  const [cdPreviewBreakdownOpen, setCdPreviewBreakdownOpen] = useState(false)
+  const cdPopoverRef = useRef(null)
+  const cdPreviewPopoverRef = useRef(null)
+  const bottomCdSectionRef = useRef(null)
+
+  const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines } = useMemo(() => {
+    const { total, lines } = estimateCdDrawBreakdown(employees)
+    return {
+      estimatedCdDraw: total,
+      cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES - total,
+      cdBreakdownLines: lines,
+    }
+  }, [employees])
+
+  const showSidePanel = cdDisplayMode === 'side_panel' && isLgViewport
+  const showBottomCd = cdDisplayMode === 'bottom_strip' || (cdDisplayMode === 'side_panel' && !isLgViewport)
+
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const onChange = () => setIsLgViewport(mq.matches)
+    onChange()
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
+
+  const handleCdDisplayModeChange = (value) => {
+    setCdDisplayMode(value)
+    if (value === 'side_panel') {
+      setCdBreakdownOpen(false)
+      setCdLivePanelOpen(false)
+      try {
+        sessionStorage.setItem(CD_LIVE_PANEL_OPEN_KEY, '0')
+      } catch {
+        /* ignore */
+      }
+    }
+    try {
+      sessionStorage.setItem(CD_DISPLAY_MODE_STORAGE_KEY, value)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const persistCdLivePanelOpen = (open) => {
+    setCdLivePanelOpen(open)
+    try {
+      sessionStorage.setItem(CD_LIVE_PANEL_OPEN_KEY, open ? '1' : '0')
+    } catch {
+      /* ignore */
+    }
+  }
+
+  useEffect(() => {
+    if (!cdBreakdownOpen && !cdPreviewBreakdownOpen) return
+    const onPointerDown = (e) => {
+      const t = e.target
+      if (cdPopoverRef.current?.contains(t)) return
+      if (cdPreviewPopoverRef.current?.contains(t)) return
+      setCdBreakdownOpen(false)
+      setCdPreviewBreakdownOpen(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    return () => document.removeEventListener('mousedown', onPointerDown)
+  }, [cdBreakdownOpen, cdPreviewBreakdownOpen])
+
+  const handleCdToolbarCtaClick = () => {
+    if (showBottomCd) {
+      setCdBreakdownOpen(true)
+      bottomCdSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+      return
+    }
+    persistCdLivePanelOpen(!cdLivePanelOpen)
+  }
+
+  const cdToolbarCtaTitle = !showBottomCd
+    ? cdLivePanelOpen
+      ? 'Hide CD balance panel'
+      : 'Show CD balance panel'
+    : 'View CD balance in footer'
+
+  const renderCdToolbarCta = () => (
+    <button
+      type="button"
+      onClick={handleCdToolbarCtaClick}
+      title={cdToolbarCtaTitle}
+      className="inline-flex items-center gap-1.5 max-w-[11rem] sm:max-w-[13rem] pl-2 pr-2 py-2 rounded-lg border border-emerald-200/90 bg-emerald-50/80 hover:bg-emerald-50 transition-colors cursor-pointer text-left min-w-0 flex-shrink-0"
+      aria-label={cdToolbarCtaTitle}
+      aria-expanded={!showBottomCd ? cdLivePanelOpen : undefined}
+    >
+      <Wallet size={14} className="text-emerald-700 flex-shrink-0" aria-hidden />
+      <span className="min-w-0 flex flex-col items-start leading-tight">
+        <span className="text-[9px] font-semibold text-emerald-800 uppercase tracking-wide">CD</span>
+        <span
+          className="text-xs font-bold text-indigo-700 tabular-nums truncate w-full"
+          title={formatInrSigned(cdAfterSubmit)}
+        >
+          {formatInrSigned(cdAfterSubmit)}
+        </span>
+      </span>
+      {cdAfterSubmit < 0 ? (
+        <AlertCircle size={14} className="text-red-600 flex-shrink-0" aria-hidden />
+      ) : (
+        <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" aria-hidden />
+      )}
+      {!showBottomCd && (
+        <ChevronDown
+          size={16}
+          className={`text-emerald-800 flex-shrink-0 transition-transform duration-200 ${cdLivePanelOpen ? 'rotate-180' : ''}`}
+          aria-hidden
+        />
+      )}
+    </button>
+  )
 
   const updateEmployee = (index, field, value) => {
     const updated = [...employees]
@@ -73,6 +299,13 @@ export default function QuickAdd() {
   const updateEmployeePlans = (index, plans) => {
     const updated = [...employees]
     updated[index] = { ...updated[index], plans }
+    const cloned = cloneEmployeeGmcPlans(plans)
+    updated[index].dependents = updated[index].dependents.map((d) => {
+      if (d.samePlansAsEmployee !== false && plans?.gmcBasePlan) {
+        return { ...d, plans: { ...cloned } }
+      }
+      return d
+    })
     setEmployees(updated)
   }
 
@@ -193,6 +426,7 @@ export default function QuickAdd() {
     ]
     setEmployees(dummyEmployees)
     setExpandedId(dummyEmployees[0].id)
+    setActiveTab(0)
   }
 
   const handleSubmit = () => {
@@ -321,7 +555,12 @@ export default function QuickAdd() {
                     </h3>
                     {depsCount > 0 && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{depsCount} added</span>}
                   </div>
-                  <DependentForm dependents={emp.dependents} onChange={(deps) => updateEmployeeDeps(idx, deps)} employeePlans={emp.plans} />
+                  <DependentForm
+                    dependents={emp.dependents}
+                    onChange={(deps) => updateEmployeeDeps(idx, deps)}
+                    employeePlans={emp.plans}
+                    hideSectionTitle
+                  />
                 </section>
 
                 {/* Done action */}
@@ -357,69 +596,74 @@ export default function QuickAdd() {
     </div>
   )
 
-  const renderTabView = () => {
-    return (
-      <div className="space-y-4">
-        {/* Compact Tab Headers */}
-        <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit">
-          {employees.map((emp, idx) => {
-            const basicDone = isBasicComplete(emp)
-            const hasAnyError = Object.keys(validate(emp)).length > 0
-            const isActive = activeTab === idx
-            
-            return (
-              <div key={emp.id} className="relative">
-                <button
-                  onClick={() => setActiveTab(idx)}
-                  className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-all ${
-                    isActive
-                      ? 'bg-white text-indigo-700 shadow-sm font-semibold'
-                      : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/50'
-                  }`}
-                >
-                  <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                    basicDone ? 'bg-emerald-100 text-emerald-600' : hasAnyError ? 'bg-red-100 text-red-500' : 'bg-gray-200 text-gray-500'
-                  }`}>
-                    {basicDone ? <CheckCircle size={10} /> : hasAnyError ? <AlertCircle size={10} /> : idx + 1}
-                  </div>
-                  <span className="hidden sm:inline truncate max-w-20">
-                    {emp.name ? emp.name.split(' ')[0] : `Emp ${idx + 1}`}
-                  </span>
-                </button>
-                {employees.length > 1 && (
-                  <button
-                    onClick={() => { removeEmployee(idx); if (activeTab >= idx && activeTab > 0) setActiveTab(activeTab - 1) }}
-                    className="absolute -top-1 -right-1 w-4 h-4 bg-red-100 hover:bg-red-200 text-red-500 rounded-full flex items-center justify-center text-xs"
-                  >
-                    <X size={8} />
-                  </button>
-                )}
-              </div>
-            )
-          })}
-          {employees.length < 5 && (
-            <button
-              onClick={() => { addEmployee(); setActiveTab(employees.length) }}
-              className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:bg-gray-200/50 rounded-md transition-colors"
-            >
-              <Plus size={14} />
-              <span className="hidden sm:inline text-xs">Add</span>
-            </button>
-          )}
-        </div>
+  /** Tab strip only — stays fixed; form scrolls below. */
+  const renderTabStrip = () => (
+    <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit max-w-full flex-wrap">
+      {employees.map((emp, idx) => {
+        const basicDone = isBasicComplete(emp)
+        const hasAnyError = Object.keys(validate(emp)).length > 0
+        const isActive = activeTab === idx
 
-        {/* Tab Content Card */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          {/* Tab Content */}
-          {employees[activeTab] && (
-            <div className="p-6 space-y-4">
-              {renderEmployeeForm(employees[activeTab], activeTab)}
-            </div>
-          )}
+        return (
+          <div key={emp.id} className="relative">
+            <button
+              type="button"
+              onClick={() => setActiveTab(idx)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+                isActive
+                  ? 'bg-white text-indigo-700 shadow-sm font-semibold'
+                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/50'
+              }`}
+            >
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                basicDone ? 'bg-emerald-100 text-emerald-600' : hasAnyError ? 'bg-red-100 text-red-500' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {basicDone ? <CheckCircle size={10} /> : hasAnyError ? <AlertCircle size={10} /> : idx + 1}
+              </div>
+              <span className="hidden sm:inline truncate max-w-20">
+                {emp.name ? emp.name.split(' ')[0] : `Emp ${idx + 1}`}
+              </span>
+            </button>
+            {employees.length > 1 && (
+              <button
+                type="button"
+                onClick={() => { removeEmployee(idx); if (activeTab >= idx && activeTab > 0) setActiveTab(activeTab - 1) }}
+                className="absolute -top-1 -right-1 w-4 h-4 bg-red-100 hover:bg-red-200 text-red-500 rounded-full flex items-center justify-center text-xs"
+              >
+                <X size={8} />
+              </button>
+            )}
+          </div>
+        )
+      })}
+      {employees.length < 5 && (
+        <button
+          type="button"
+          onClick={() => { addEmployee(); setActiveTab(employees.length) }}
+          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:bg-gray-200/50 rounded-md transition-colors"
+        >
+          <Plus size={14} />
+          <span className="hidden sm:inline text-xs">Add</span>
+        </button>
+      )}
+    </div>
+  )
+
+  const renderTabFormCard = (embedded = false) => (
+    <div
+      className={
+        embedded
+          ? 'overflow-hidden'
+          : 'bg-white border border-gray-200 rounded-xl overflow-hidden'
+      }
+    >
+      {employees[activeTab] && (
+        <div className={`space-y-4 ${embedded ? 'py-1' : 'p-6'}`}>
+          {renderEmployeeForm(employees[activeTab], activeTab)}
         </div>
-      </div>
-    )
-  }
+      )}
+    </div>
+  )
 
   const renderEmployeeForm = (emp, idx) => {
     const errors = validate(emp)
@@ -475,7 +719,12 @@ export default function QuickAdd() {
             </h3>
             {depsCount > 0 && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{depsCount} added</span>}
           </div>
-          <DependentForm dependents={emp.dependents} onChange={(deps) => updateEmployeeDeps(idx, deps)} employeePlans={emp.plans} />
+          <DependentForm
+            dependents={emp.dependents}
+            onChange={(deps) => updateEmployeeDeps(idx, deps)}
+            employeePlans={emp.plans}
+            hideSectionTitle
+          />
         </section>
       </>
     )
@@ -548,7 +797,44 @@ export default function QuickAdd() {
             </div>
           ))}
         </div>
-        <div className="flex justify-end gap-3 mt-5">
+        <div
+          ref={cdPreviewPopoverRef}
+          className="relative mt-5 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-4 py-3"
+        >
+          {cdPreviewBreakdownOpen && (
+            <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-sm rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+              <CdBreakdownPopoverBody lines={cdBreakdownLines} />
+            </div>
+          )}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide">CD balance</span>
+              <button
+                type="button"
+                onClick={() => setCdPreviewBreakdownOpen((o) => !o)}
+                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-indigo-600 hover:bg-white/80 cursor-pointer"
+              >
+                <Info size={12} className="flex-shrink-0" aria-hidden /> Details
+              </button>
+            </div>
+            {cdAfterSubmit < 0 ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 flex-shrink-0">
+                <AlertCircle size={14} aria-hidden /> Insufficient
+              </span>
+            ) : (
+              <span className="flex-shrink-0" title="Sufficient CD for this batch (est.)">
+                <CheckCircle size={14} className="text-emerald-600" aria-hidden />
+              </span>
+            )}
+          </div>
+          <p className="text-lg font-bold text-indigo-700 tabular-nums mt-1">{formatInrSigned(cdAfterSubmit)}</p>
+          <p className="text-[11px] text-gray-600 tabular-nums leading-snug mt-0.5">
+            <span className="text-gray-500">Current</span> {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
+            <span className="text-gray-400"> · </span>
+            <span className="text-red-600 font-medium">−Est. {formatInr(estimatedCdDraw)}</span>
+          </p>
+        </div>
+        <div className="flex justify-end gap-3 mt-4">
           <button onClick={() => setShowPreview(false)} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Edit</button>
           <button onClick={handleSubmit} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><CheckCircle size={16} /> Submit Endorsement</button>
         </div>
@@ -565,43 +851,169 @@ export default function QuickAdd() {
           breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Quick Add' }]}
           trailing={<Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={1} compact />}
           navTrailing={
-            <select
-              value={uiVariation}
-              onChange={e => setUiVariation(e.target.value)}
-              className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium"
-            >
-              <option value="variation2">Tab View</option>
-              <option value="variation1">Accordion View</option>
-            </select>
+            <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+              <select
+                aria-label="Employee form layout"
+                value={uiVariation}
+                onChange={(e) => setUiVariation(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium max-w-[9rem]"
+              >
+                <option value="variation2">Tab View</option>
+                <option value="variation1">Accordion View</option>
+              </select>
+              <select
+                aria-label="CD summary placement"
+                value={cdDisplayMode}
+                onChange={(e) => handleCdDisplayModeChange(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium max-w-[10rem]"
+              >
+                <option value="bottom_strip">CD: Bottom bar</option>
+                <option value="side_panel">CD: Live panel</option>
+              </select>
+              <button
+                type="button"
+                onClick={prefillData}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 transition-colors cursor-pointer"
+              >
+                <Sparkles size={13} aria-hidden /> Prefill Data
+              </button>
+            </div>
           }
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        {uiVariation === 'variation1' ? renderAccordionView() : renderTabView()}
+      <div className="flex-1 min-h-0 flex flex-col min-h-0">
+        {showSidePanel ? (
+          <div className="flex flex-1 min-h-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <div className="flex flex-row items-start">
+                <div
+                  className={`flex-1 min-w-0 ${showSidePanel && cdLivePanelOpen ? 'border-r border-gray-100' : ''}`}
+                >
+                  {uiVariation === 'variation1' ? (
+                    <>
+                      <div className="sticky top-0 z-20 flex justify-end py-2.5 px-4 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+                        {renderCdToolbarCta()}
+                      </div>
+                      <div className="px-4 pb-8 pt-4">{renderAccordionView()}</div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 py-2.5 px-4 bg-white/95 backdrop-blur-sm border-b border-gray-100">
+                        <div className="min-w-0 flex-1 overflow-x-auto pb-0.5">{renderTabStrip()}</div>
+                        {renderCdToolbarCta()}
+                      </div>
+                      <div className="px-4 pb-8 pt-4">{renderTabFormCard(true)}</div>
+                    </>
+                  )}
+                </div>
+                {showSidePanel && cdLivePanelOpen && (
+                  <aside className="shrink-0 sticky top-0 self-start max-h-[calc(100vh-7.5rem)] w-[min(22rem,calc(100vw-28rem))] flex flex-col border-l border-gray-100 bg-gradient-to-b from-gray-50/90 to-white">
+                    <div className="p-2 min-h-0 overflow-y-auto">
+                      <PremiumEstimateLivePanel
+                        lines={cdBreakdownLines}
+                        totalPremium={estimatedCdDraw}
+                        currentCd={MOCK_CD_AVAILABLE_RUPEES}
+                        balanceAfter={cdAfterSubmit}
+                        isSufficient={cdAfterSubmit >= 0}
+                        policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
+                        onCollapse={() => persistCdLivePanelOpen(false)}
+                        collapseAriaLabel="Close CD balance panel"
+                        collapseTitle="Close CD balance panel"
+                      />
+                    </div>
+                  </aside>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <>
+            {uiVariation === 'variation1' ? (
+              <>
+                <div className="flex-shrink-0 flex justify-end py-2 -mx-6 lg:-mx-8 px-6 lg:px-8 border-b border-gray-200/90 bg-gray-50/80">
+                  {renderCdToolbarCta()}
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto pb-4 pt-3">{renderAccordionView()}</div>
+              </>
+            ) : (
+              <>
+                <div className="flex-shrink-0 flex items-center justify-between gap-3 py-2.5 -mt-1 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-gray-50 border-b border-gray-200/90 z-30">
+                  <div className="min-w-0 flex-1 overflow-x-auto pb-0.5">{renderTabStrip()}</div>
+                  {renderCdToolbarCta()}
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto pb-4 pt-3">{renderTabFormCard()}</div>
+              </>
+            )}
+          </>
+        )}
       </div>
 
-      {/* Footer */}
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3.5 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-500">{employees.length} employee{employees.length > 1 ? 's' : ''} added</span>
-          <button
-            onClick={prefillData}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 rounded-lg hover:bg-purple-100 hover:border-purple-300 transition-colors cursor-pointer"
-          >
-            <Sparkles size={13} /> Prefill Data
-          </button>
-          {employees.length < 5 && (
-            <button
-              onClick={addEmployee}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer"
-            >
-              <UserPlus size={13} /> Add Employee
-              <span className="text-indigo-400 font-normal">({employees.length}/5)</span>
-            </button>
+      {/* Sticky bottom: optional CD + Preview */}
+      <div
+        className={`flex-shrink-0 sticky bottom-0 z-40 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] ${showBottomCd ? 'py-3.5' : 'py-2.5'}`}
+      >
+        <div
+          className={`flex items-center ${showBottomCd ? 'flex-col gap-3 sm:flex-row sm:justify-between' : 'justify-end'}`}
+        >
+          {showBottomCd && (
+            <div ref={bottomCdSectionRef} className="flex items-center gap-3 min-w-0 flex-1 w-full sm:w-auto">
+              <div
+                ref={cdPopoverRef}
+                className="relative flex items-center gap-3 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-3.5 py-2 sm:px-4 sm:py-2.5 min-w-0 flex-1 sm:flex-initial sm:max-w-xl"
+              >
+                {cdBreakdownOpen && (
+                  <div className="absolute bottom-full left-0 z-50 mb-2 w-[min(100vw-3rem,280px)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+                    <CdBreakdownPopoverBody lines={cdBreakdownLines} />
+                  </div>
+                )}
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <Wallet className="text-emerald-700 w-[18px] h-[18px] sm:w-5 sm:h-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1 min-w-0">
+                      <span className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide truncate">CD balance</span>
+                      <button
+                        type="button"
+                        onClick={() => setCdBreakdownOpen((o) => !o)}
+                        className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-indigo-600 hover:bg-white/80 flex-shrink-0 cursor-pointer"
+                      >
+                        <Info size={12} aria-hidden /> Details
+                      </button>
+                    </div>
+                    {cdAfterSubmit < 0 ? (
+                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600 flex-shrink-0">
+                        <AlertCircle size={14} aria-hidden /> Insufficient
+                      </span>
+                    ) : (
+                      <span className="flex-shrink-0" title="Sufficient CD for this batch (est.)">
+                        <CheckCircle size={14} className="text-emerald-600" aria-hidden />
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-base sm:text-lg font-bold text-indigo-700 tabular-nums truncate mt-0.5">
+                    {formatInrSigned(cdAfterSubmit)}
+                  </p>
+                  <p className="text-[11px] text-gray-600 tabular-nums leading-snug">
+                    <span className="text-gray-500">Current</span> {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
+                    <span className="text-gray-400"> · </span>
+                    <span className="text-red-600 font-medium">−Est. {formatInr(estimatedCdDraw)}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
           )}
+          <div className={`flex items-center justify-end flex-shrink-0 ${showBottomCd ? 'w-full sm:w-auto' : ''}`}>
+            <button
+              type="button"
+              onClick={handlePreview}
+              className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center justify-center gap-2 cursor-pointer"
+            >
+              <Eye size={16} /> Preview &amp; Submit
+            </button>
+          </div>
         </div>
-        <button onClick={handlePreview} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><Eye size={16} /> Preview & Submit</button>
       </div>
     </div>
   )

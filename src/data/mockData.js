@@ -85,11 +85,11 @@ export const dependentRelationGroups = [
 ]
 
 export const mockEmployees = [
-  { id: 'EMP001', name: 'Rahul Sharma', email: 'rahul.sharma@acme.com', department: 'Engineering', designation: 'Senior Software Engineer', dob: '1992-05-15', gender: 'Male', doj: '2023-01-10', mobile: '9876543210' },
-  { id: 'EMP002', name: 'Priya Nair', email: 'priya.nair@acme.com', department: 'Product', designation: 'Product Manager', dob: '1990-08-22', gender: 'Female', doj: '2022-06-15', mobile: '9876543211' },
-  { id: 'EMP003', name: 'Arjun Patel', email: 'arjun.patel@acme.com', department: 'Design', designation: 'Designer', dob: '1995-01-30', gender: 'Male', doj: '2024-03-01', mobile: '9876543212' },
-  { id: 'EMP004', name: 'Sneha Reddy', email: 'sneha.reddy@acme.com', department: 'Marketing', designation: 'Manager', dob: '1988-11-12', gender: 'Female', doj: '2021-09-20', mobile: '9876543213' },
-  { id: 'EMP005', name: 'Vikram Joshi', email: 'vikram.joshi@acme.com', department: 'Finance', designation: 'Analyst', dob: '1993-07-08', gender: 'Male', doj: '2023-11-01', mobile: '9876543214' },
+  { id: 'EMP001', name: 'Rahul Sharma', email: 'rahul.sharma@acme.com', department: 'Engineering', designation: 'Senior Software Engineer', dob: '1992-05-15', gender: 'Male', doj: '2023-01-10', mobile: '9876543210', plans: { gmcBasePlan: 'bp1', gmcSecondaryPlan: 'sp1' } },
+  { id: 'EMP002', name: 'Priya Nair', email: 'priya.nair@acme.com', department: 'Product', designation: 'Product Manager', dob: '1990-08-22', gender: 'Female', doj: '2022-06-15', mobile: '9876543211', plans: { gmcBasePlan: 'bp2', gmcSecondaryPlan: 'sp1' } },
+  { id: 'EMP003', name: 'Arjun Patel', email: 'arjun.patel@acme.com', department: 'Design', designation: 'Designer', dob: '1995-01-30', gender: 'Male', doj: '2024-03-01', mobile: '9876543212', plans: { gmcBasePlan: 'bp1', gmcSecondaryPlan: 'none' } },
+  { id: 'EMP004', name: 'Sneha Reddy', email: 'sneha.reddy@acme.com', department: 'Marketing', designation: 'Manager', dob: '1988-11-12', gender: 'Female', doj: '2021-09-20', mobile: '9876543213', plans: { gmcBasePlan: 'bp2', gmcSecondaryPlan: 'sp2' } },
+  { id: 'EMP005', name: 'Vikram Joshi', email: 'vikram.joshi@acme.com', department: 'Finance', designation: 'Analyst', dob: '1993-07-08', gender: 'Male', doj: '2023-11-01', mobile: '9876543214', plans: { gmcBasePlan: 'bp1' } },
 ]
 
 export const hrmsJoiningEmployees = [

@@ -69,7 +69,11 @@ export default function AddDependents() {
           </div>
           <div className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
             <p className="text-xs font-semibold text-amber-700/70 uppercase tracking-wider mb-3">Dependent Details</p>
-            <DependentForm dependents={dependents} onChange={setDependents} />
+            <DependentForm
+              dependents={dependents}
+              onChange={setDependents}
+              employeePlans={selectedEmployee.plans || {}}
+            />
           </div>
           <div className="flex justify-end mt-5">
             <button onClick={() => { addEntry({ action: 'Add Dependents', count: dependents.length, status: 'Success', type: 'quick' }); setSubmitted(true); setTimeout(() => navigate('/'), 2000) }} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><CheckCircle size={16} /> Submit</button>

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- context + hook live together by design */
 import { createContext, useContext, useState } from 'react'
 import { endorsementHistory as seed } from '../data/mockData'
 

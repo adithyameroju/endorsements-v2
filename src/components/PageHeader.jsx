@@ -20,7 +20,7 @@ export default function PageHeader({ title, subtitle, breadcrumbs = [], backPath
                 className="group inline-flex items-center gap-1.5 pl-2 pr-3 py-1.5 rounded-lg bg-gray-100 text-gray-600 hover:bg-indigo-600 hover:text-white transition-all cursor-pointer border border-transparent hover:border-indigo-600"
               >
                 <ArrowLeft size={14} className="transition-transform group-hover:-translate-x-0.5" />
-                <span className="text-xs font-semibold">Back</span>
+                <span className="text-xs font-semibold">{resolvedBackLabel}</span>
               </button>
               <div className="w-px h-4 bg-gray-200 mx-2.5 flex-shrink-0" />
             </>

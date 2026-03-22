@@ -1,16 +1,40 @@
-# React + Vite
+# Employer Portal — Endorsements (V2)
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+## Cursor / browser not loading?
 
-Currently, two official plugins are available:
+**Do not use “Preview” on `index.html` alone** — this app needs the Vite dev server.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Read **`START_HERE.md`** (short step‑by‑step).
 
-## React Compiler
+---
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Run locally (dev)
 
-## Expanding the ESLint configuration
+```bash
+npm install
+npm run dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Open **http://127.0.0.1:5173/** (terminal opens this for you).  
+If **`localhost:5173`** does not load, use **`127.0.0.1`** instead (common on macOS IPv6 vs IPv4).
+
+**Cursor:** *Terminal → Run Task → “Start app (Vite)”* or run `npm run dev` in the integrated terminal.
+
+---
+
+## Production build + preview
+
+```bash
+npm run build
+npm run preview
+```
+
+Open **http://127.0.0.1:4173/**
+
+---
+
+## Live demo (GitHub Pages)
+
+https://adithya.meroju.github.io/endorsements-v2/
+
+Production builds use **relative** asset paths (`./assets/...`) so the site works in that subfolder.

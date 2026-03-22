@@ -169,7 +169,11 @@ export default function HRMSSync() {
                   <PlanSelection plans={state.plans} onChange={(plans) => updateJoining(emp.id, { plans })} label={`hrms-${emp.id}`} />
                   <div>
                     <h4 className="text-sm font-semibold text-gray-900 mb-3">Dependents</h4>
-                    <DependentForm dependents={state.dependents} onChange={(deps) => updateJoining(emp.id, { dependents: deps })} />
+                    <DependentForm
+                      dependents={state.dependents}
+                      onChange={(deps) => updateJoining(emp.id, { dependents: deps })}
+                      employeePlans={state.plans}
+                    />
                   </div>
                   <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
                     <button onClick={() => updateJoining(emp.id, { managing: false })} className="px-4 py-2 text-xs font-medium text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>

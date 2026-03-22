@@ -4,7 +4,7 @@ import { Search, User, CheckCircle, Plus, Trash2 } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
-import { mockEmployees, basePlans, secondaryPlans, addonPlans, gpaBasePlans } from '../data/mockData'
+import { mockEmployees, basePlans, secondaryPlans, addonPlans } from '../data/mockData'
 import { useEndorsements } from '../store/EndorsementStore'
 
 const emptyChild = (num) => ({ id: Date.now() + num, name: '', dob: '', gender: '', samePlansAsEmployee: true, plans: {} })
@@ -193,7 +193,7 @@ export default function LifeEventNewborn() {
                     <p className="text-sm font-medium text-gray-900">{formatEmployeeGmcOnly(mockEmployeePlans)}</p>
                   </div>
                 ) : (
-                  <PlanSelection plans={child.plans} onChange={plans => updateChild(idx, 'plans', plans)} label={`newborn-${idx}`} gmcOnly />
+                  <PlanSelection plans={child.plans} onChange={plans => updateChild(idx, 'plans', plans)} label={`newborn-${idx}`} gmcOnly hideInsuranceHeader hideGmcToggle />
                 )}
               </div>
             </div>
