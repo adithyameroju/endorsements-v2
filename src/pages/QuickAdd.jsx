@@ -87,7 +87,7 @@ function readStoredCdPlacement() {
   } catch {
     /* private mode / unavailable */
   }
-  return 'bottom'
+  return 'sidebar'
 }
 
 const CD_EST_PRIMARY_COMPLETE_RUPEES = 42_000
