@@ -165,7 +165,7 @@ export default function PlanSelection({
                       active={(plans.gmcAddons || []).length > 0}
                       onToggle={(on) => updatePlans('gmcAddons', on ? [addonPlans[0].id] : [])}
                     >
-                      <div className="flex flex-wrap gap-1 w-full">
+                      <div className="flex flex-nowrap items-center gap-1 w-full min-w-0 overflow-x-auto sm:[scrollbar-width:thin] pb-0.5">
                         {addonPlans.map((p) => {
                           const sel = (plans.gmcAddons || []).includes(p.id)
                           return (
@@ -176,7 +176,7 @@ export default function PlanSelection({
                                 const cur = plans.gmcAddons || []
                                 updatePlans('gmcAddons', sel ? cur.filter((a) => a !== p.id) : [...cur, p.id])
                               }}
-                              className={`px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium ${
+                              className={`shrink-0 px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium whitespace-nowrap ${
                                 sel
                                   ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
                                   : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
@@ -235,7 +235,7 @@ export default function PlanSelection({
                       active={(plans.gmcAddons || []).length > 0}
                       onToggle={(on) => updatePlans('gmcAddons', on ? [addonPlans[0].id] : [])}
                     >
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex flex-nowrap items-center gap-1.5 w-full min-w-0 overflow-x-auto sm:[scrollbar-width:thin] pb-0.5">
                         {addonPlans.map((p) => {
                           const sel = (plans.gmcAddons || []).includes(p.id)
                           return (
@@ -246,7 +246,7 @@ export default function PlanSelection({
                                 const cur = plans.gmcAddons || []
                                 updatePlans('gmcAddons', sel ? cur.filter((a) => a !== p.id) : [...cur, p.id])
                               }}
-                              className={`px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium ${
+                              className={`shrink-0 px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium whitespace-nowrap ${
                                 sel
                                   ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
                                   : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
@@ -290,8 +290,8 @@ export default function PlanSelection({
           {/* GPA Toggle Header */}
           <div className="flex items-center justify-between p-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 bg-red-50 rounded-lg flex items-center justify-center">
-                <Shield size={16} className="text-red-600" />
+              <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center">
+                <Shield size={16} className="text-blue-600" />
               </div>
               <div>
                 <span className="text-base font-bold text-gray-900">GPA</span>
@@ -305,16 +305,16 @@ export default function PlanSelection({
                 onChange={e => toggleGPA(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
             </label>
           </div>
 
           {/* GPA Options */}
           {gpaEnabled && (
-            <div className="border-t border-gray-100 p-4 bg-red-50/20 space-y-3">
+            <div className="border-t border-gray-100 p-4 bg-blue-50/25 space-y-3">
               <div>
                 <label className={formFieldLabelClass}>
-                  Base Plan <span className="text-red-500">*</span>
+                  Base Plan <span className="text-blue-700">*</span>
                 </label>
                 <select
                   value={plans.gpaBasePlan || ''}
@@ -328,16 +328,16 @@ export default function PlanSelection({
 
               {plans.gpaBasePlan && (
                 <div>
-                  <label className={formFieldLabelClass}>Sum Insured Method <span className="text-red-500">*</span></label>
+                  <label className={formFieldLabelClass}>Sum Insured Method <span className="text-blue-700">*</span></label>
                   <div className="space-y-1.5">
                     <label className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                      plans.gpaSiType === 'fixed' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                      plans.gpaSiType === 'fixed' ? 'border-blue-300 bg-blue-50/80' : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}>
-                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'fixed'} onChange={() => updatePlans('gpaSiType', 'fixed')} className="accent-red-600" />
+                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'fixed'} onChange={() => updatePlans('gpaSiType', 'fixed')} className="accent-blue-600" />
                       <div className="flex-1">
                         <span className="text-sm text-gray-900">Fixed Sum Insured</span>
                         {plans.gpaSiType === 'fixed' && (
-                          <span className="ml-2 text-xs text-red-600 font-medium">
+                          <span className="ml-2 text-xs text-blue-800 font-medium">
                             {fmt(gpaBasePlans.find(p => p.id === plans.gpaBasePlan)?.sumInsured || 0)}
                           </span>
                         )}
@@ -345,9 +345,9 @@ export default function PlanSelection({
                     </label>
 
                     <label className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                      plans.gpaSiType === 'ctc' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                      plans.gpaSiType === 'ctc' ? 'border-blue-300 bg-blue-50/80' : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}>
-                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'ctc'} onChange={() => updatePlans('gpaSiType', 'ctc')} className="accent-red-600" />
+                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'ctc'} onChange={() => updatePlans('gpaSiType', 'ctc')} className="accent-blue-600" />
                       <div className="flex-1 flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-gray-900">Based on CTC</span>
                         {plans.gpaSiType === 'ctc' && (
@@ -357,16 +357,16 @@ export default function PlanSelection({
                             value={plans.gpaCtc || ''}
                             onChange={e => updatePlans('gpaCtc', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-red-200 rounded-lg bg-white box-border"
+                            className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-blue-200 rounded-lg bg-white box-border"
                           />
                         )}
                       </div>
                     </label>
 
                     <label className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
-                      plans.gpaSiType === 'manual' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
+                      plans.gpaSiType === 'manual' ? 'border-blue-300 bg-blue-50/80' : 'border-gray-200 bg-white hover:border-gray-300'
                     }`}>
-                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'manual'} onChange={() => updatePlans('gpaSiType', 'manual')} className="accent-red-600" />
+                      <input type="radio" name={`gpa-si-${label}`} checked={plans.gpaSiType === 'manual'} onChange={() => updatePlans('gpaSiType', 'manual')} className="accent-blue-600" />
                       <div className="flex-1 flex items-center gap-2 flex-wrap">
                         <span className="text-sm text-gray-900">Enter Sum Insured</span>
                         {plans.gpaSiType === 'manual' && (
@@ -377,7 +377,7 @@ export default function PlanSelection({
                               value={plans.gpaManualSi || ''}
                               onChange={e => updatePlans('gpaManualSi', e.target.value)}
                               onClick={e => e.stopPropagation()}
-                              className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-red-200 rounded-lg bg-white box-border"
+                              className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-blue-200 rounded-lg bg-white box-border"
                             />
                             <span className="text-xs text-gray-400">₹1L – ₹50L</span>
                           </div>

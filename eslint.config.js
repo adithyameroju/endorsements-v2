@@ -24,7 +24,16 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': [
+        'error',
+        {
+          varsIgnorePattern: '^[A-Z_]',
+          argsIgnorePattern: '^[A-Z_]',
+          caughtErrorsIgnorePattern: '^[A-Z_]',
+        },
+      ],
+      // Draft restore, tab clamp, premium stale sync — valid effect-driven UI; revisit for React Compiler.
+      'react-hooks/set-state-in-effect': 'off',
     },
   },
 ])

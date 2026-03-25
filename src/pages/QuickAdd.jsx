@@ -1,14 +1,22 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, Eye, EyeOff, CheckCircle, User, Trash2, ChevronUp, AlertCircle, Sparkles, X, Wallet, Info } from 'lucide-react'
+import { Plus, ChevronDown, Eye, EyeOff, CheckCircle, User, Trash2, ChevronUp, AlertCircle, Sparkles, X, Wallet, FolderOpen, Calculator } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
 import DependentForm from '../components/DependentForm'
-import { designations, basePlans, gpaBasePlans } from '../data/mockData'
+import { basePlans } from '../data/mockData'
 import { cloneEmployeeGmcPlans } from '../lib/planHelpers'
 import AnimatedCdAmount from '../components/AnimatedCdAmount'
-import { formatInr, formatInrSigned } from '../lib/currencyFormat'
+import CdBalanceFormWidget from '../components/CdBalanceFormWidget'
+import QuickAddBatchStickyFooter from '../components/QuickAddBatchStickyFooter'
+import { formatInrSigned } from '../lib/currencyFormat'
+import {
+  clearQuickAddDraft,
+  loadQuickAddDraft,
+  hasQuickAddDraft,
+  formatDraftSavedLabel,
+} from '../lib/quickAddDraft'
 import { useEndorsements } from '../store/EndorsementStore'
 import QuickAddReviewScreen from '../components/QuickAddReviewScreen'
 import {
@@ -18,33 +26,29 @@ import {
   formControlClass,
   formControlErrorClass,
 } from '../lib/formUi'
+import {
+  validateBasicFields as validate,
+  hasPlans,
+  employeeHasAnyValidationIssue,
+  sectionErrorFlags,
+  formatEmployeeIssueTooltip,
+  buildQuickAddErrorBannerSummary,
+} from '../lib/quickAddValidation'
+
+/** Sidebar / header CD column — +10px vs previous 19rem / 21rem cap. */
+const CD_RAIL_WIDTH_CLASS = 'w-[min(calc(19rem+10px),32vw)] max-w-[calc(21rem+10px)]'
 
 const defaultGmcBaseId = basePlans[0]?.id || ''
 
 const emptyEmployee = () => ({
   id: Date.now(),
-  name: '', empId: '', email: '', dob: '', designation: '',
+  name: '', empId: '', email: '', dob: '',
   gender: '', doj: '', mobile: '',
   plans: defaultGmcBaseId ? { gmcBasePlan: defaultGmcBaseId } : {},
   dependents: [],
 })
 
-const requiredFields = ['name', 'empId', 'email', 'dob', 'designation', 'gender', 'doj', 'mobile']
-
-function validate(emp) {
-  const errors = {}
-  if (!emp.name.trim()) errors.name = 'Name is required'
-  if (!emp.empId.trim()) errors.empId = 'Employee ID is required'
-  if (!emp.email.trim()) errors.email = 'Email is required'
-  else if (!/\S+@\S+\.\S+/.test(emp.email)) errors.email = 'Invalid email format'
-  if (!emp.dob) errors.dob = 'Date of birth is required'
-  if (!emp.designation) errors.designation = 'Designation is required'
-  if (!emp.gender) errors.gender = 'Gender is required'
-  if (!emp.doj) errors.doj = 'Date of joining is required'
-  if (!emp.mobile.trim()) errors.mobile = 'Mobile is required'
-  else if (!/^\d{10}$/.test(emp.mobile)) errors.mobile = 'Must be 10 digits'
-  return errors
-}
+const requiredFields = ['name', 'empId', 'email', 'dob', 'gender', 'doj']
 
 function isFilled(emp) {
   return emp.name.trim() && emp.empId.trim() && emp.email.trim()
@@ -54,17 +58,13 @@ function isBasicComplete(emp) {
   return requiredFields.every(f => emp[f] && String(emp[f]).trim())
 }
 
-function hasPlans(emp) {
-  return emp.plans && (emp.plans.gmcBasePlan || emp.plans.gpaBasePlan)
-}
-
 function fieldCount(emp) {
   return requiredFields.filter(f => emp[f] && String(emp[f]).trim()).length
 }
 
 /** Replace with API / context in production */
 const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
-/** Illustrative policy context for Premium Estimate header */
+/** Illustrative policy context for CD / premium panel header */
 const MOCK_POLICY_DAYS_LEFT = 9
 
 const CD_BALANCE_VISIBLE_KEY = 'quickAdd_cdBalanceVisible'
@@ -123,7 +123,7 @@ function estimateCdDrawBreakdown(employees) {
 
   const lines = []
   if (primaryTotal > 0) {
-    lines.push({ id: 'primary', label: 'Primary (employees)', amount: primaryTotal })
+    lines.push({ id: 'primary', label: 'Primary premium (pro-rata)', amount: primaryTotal })
   }
   if (dependentTotal > 0) {
     lines.push({
@@ -140,34 +140,6 @@ function estimateCdDrawBreakdown(employees) {
   return { total, lines }
 }
 
-function CdBreakdownPopoverBody({ lines }) {
-  const detailLines = lines.filter((l) => l.id !== 'total')
-  const totalLine = lines.find((l) => l.id === 'total')
-  return (
-    <>
-      <p className="text-[11px] font-semibold text-gray-800 border-b border-gray-100 pb-2 mb-2">Premium estimate (est.)</p>
-      {detailLines.length > 0 ? (
-        <ul className="space-y-1.5">
-          {detailLines.map((l) => (
-            <li key={l.id} className="flex justify-between gap-4 text-[11px] text-gray-600">
-              <span>{l.label}</span>
-              <span className="tabular-nums font-medium text-gray-900">{formatInr(l.amount)}</span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="text-[11px] text-gray-500">No line items yet — add employees or dependents to see breakdown.</p>
-      )}
-      {totalLine && (
-        <div className="flex justify-between gap-4 pt-2 mt-2 border-t border-gray-100 text-xs font-semibold text-gray-900">
-          <span>{totalLine.label}</span>
-          <span className="tabular-nums text-indigo-700">{formatInr(totalLine.amount)}</span>
-        </div>
-      )}
-    </>
-  )
-}
-
 export default function QuickAdd() {
   const navigate = useNavigate()
   const { addEntry } = useEndorsements()
@@ -179,11 +151,18 @@ export default function QuickAdd() {
   const [activeTab, setActiveTab] = useState(0)
   const [cdBalanceVisible, setCdBalanceVisible] = useState(readStoredCdBalanceVisible)
   const [cdPlacement, setCdPlacement] = useState(readStoredCdPlacement)
-  const [cdBreakdownOpen, setCdBreakdownOpen] = useState(false)
   const [isLgViewport, setIsLgViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
   )
-  const cdPopoverRef = useRef(null)
+  const [draftBanner, setDraftBanner] = useState('')
+  const draftBannerTimer = useRef(null)
+  const [draftOffer, setDraftOffer] = useState(null)
+  const draftOfferChecked = useRef(false)
+  const [hasDraftOnDisk, setHasDraftOnDisk] = useState(() => hasQuickAddDraft())
+  /** fresh → Calculate | calculated → Preview | stale → Recalculate after edits */
+  const [premiumFlow, setPremiumFlow] = useState('fresh')
+  const isFirstEmployeesEffect = useRef(true)
+  const suppressPremiumStaleOnce = useRef(false)
 
   const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines } = useMemo(() => {
     const { total, lines } = estimateCdDrawBreakdown(employees)
@@ -201,6 +180,23 @@ export default function QuickAdd() {
     return { count, basicsComplete, dependentCount }
   }, [employees])
 
+  const errorBannerSummary = useMemo(
+    () => buildQuickAddErrorBannerSummary(employees),
+    [employees],
+  )
+
+  useEffect(() => {
+    if (isFirstEmployeesEffect.current) {
+      isFirstEmployeesEffect.current = false
+      return
+    }
+    if (suppressPremiumStaleOnce.current) {
+      suppressPremiumStaleOnce.current = false
+      return
+    }
+    setPremiumFlow((f) => (f === 'calculated' ? 'stale' : f))
+  }, [employees])
+
   useEffect(() => {
     setActiveTab((t) => Math.min(t, Math.max(0, employees.length - 1)))
   }, [employees.length])
@@ -213,6 +209,31 @@ export default function QuickAdd() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
+  useEffect(() => {
+    if (draftOfferChecked.current) return
+    draftOfferChecked.current = true
+    const d = loadQuickAddDraft()
+    if (d?.employees?.length) setDraftOffer(d)
+  }, [])
+
+  /** Hide the startup restore banner once the user has real in-progress data. */
+  useEffect(() => {
+    if (!draftOffer) return
+    const first = employees[0]
+    const pristineEmptyRow =
+      employees.length === 1 &&
+      !isFilled(first) &&
+      (first.dependents?.length ?? 0) === 0
+    if (!pristineEmptyRow) setDraftOffer(null)
+  }, [employees, draftOffer])
+
+  useEffect(
+    () => () => {
+      if (draftBannerTimer.current) clearTimeout(draftBannerTimer.current)
+    },
+    [],
+  )
+
   /** Sidebar rail on large screens (accordion + tab each keep their own layout below). */
   const showFormSidebarCd = cdPlacement === 'sidebar' && isLgViewport
   /** Unified chrome: full-width header (tabs | CD CTA) + rail under CTA — only Sidebar CD + Tab view + lg. */
@@ -224,7 +245,6 @@ export default function QuickAdd() {
 
   const persistCdPlacement = (value) => {
     setCdPlacement(value)
-    setCdBreakdownOpen(false)
     try {
       sessionStorage.setItem(CD_PLACEMENT_STORAGE_KEY, value)
     } catch {
@@ -240,17 +260,6 @@ export default function QuickAdd() {
       /* ignore */
     }
   }
-
-  useEffect(() => {
-    if (!cdBreakdownOpen) return
-    const onPointerDown = (e) => {
-      const t = e.target
-      if (cdPopoverRef.current?.contains(t)) return
-      setCdBreakdownOpen(false)
-    }
-    document.addEventListener('mousedown', onPointerDown)
-    return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [cdBreakdownOpen])
 
   const updateEmployee = (index, field, value) => {
     const updated = [...employees]
@@ -318,16 +327,47 @@ export default function QuickAdd() {
     }
   }
 
+  const touchAllFieldsForEmployee = (empId) => {
+    const allTouched = {}
+    requiredFields.forEach((f) => {
+      allTouched[f] = true
+    })
+    allTouched.mobile = true
+    setTouchedMap((prev) => ({ ...prev, [empId]: { ...(prev[empId] || {}), ...allTouched } }))
+  }
+
+  const handleCalculatePremium = () => {
+    setPremiumFlow('calculated')
+  }
+
+  const scrollToFirstErrorSectionForEmployee = (emp) => {
+    const flags = sectionErrorFlags(emp)
+    const order = [
+      ['basic', 'basic'],
+      ['plans', 'plans'],
+      ['dependents', 'dependents'],
+    ]
+    for (const [flagKey, idSuffix] of order) {
+      if (!flags[flagKey]) continue
+      const el = document.getElementById(`quickadd-${emp.id}-section-${idSuffix}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        return
+      }
+    }
+  }
+
   const handlePreview = () => {
+    if (premiumFlow !== 'calculated') return
     let hasErrors = false
     for (const emp of employees) {
-      const errors = validate(emp)
-      if (Object.keys(errors).length > 0) {
+      if (employeeHasAnyValidationIssue(emp)) {
         hasErrors = true
         setExpandedId(emp.id)
-        const allTouched = {}
-        requiredFields.forEach(f => allTouched[f] = true)
-        setTouchedMap(prev => ({ ...prev, [emp.id]: allTouched }))
+        const idx = employees.findIndex((e) => e.id === emp.id)
+        if (idx !== -1) setActiveTab(idx)
+        touchAllFieldsForEmployee(emp.id)
+        window.setTimeout(() => scrollToFirstErrorSectionForEmployee(emp), 150)
         break
       }
     }
@@ -335,6 +375,7 @@ export default function QuickAdd() {
   }
 
   const prefillData = () => {
+    suppressPremiumStaleOnce.current = true
     const dummyEmployees = [
       {
         id: Date.now(),
@@ -342,7 +383,6 @@ export default function QuickAdd() {
         empId: 'EMP101',
         email: 'rajesh.k@acko.com',
         dob: '1990-05-15',
-        designation: 'Software Engineer',
         gender: 'Male',
         doj: '2026-03-20',
         mobile: '9876543210',
@@ -371,7 +411,6 @@ export default function QuickAdd() {
         empId: 'EMP102',
         email: 'anita.s@acko.com',
         dob: '1988-12-03',
-        designation: 'Product Manager',
         gender: 'Female',
         doj: '2026-03-25',
         mobile: '9876543211',
@@ -397,45 +436,89 @@ export default function QuickAdd() {
     setEmployees(dummyEmployees)
     setExpandedId(dummyEmployees[0].id)
     setActiveTab(0)
+    setDraftOffer(null)
+    setPremiumFlow('fresh')
   }
 
   const handleSubmit = () => {
     const details = employees.map(emp => ({
       name: emp.name,
       id: emp.empId,
-      designation: emp.designation,
     }))
     addEntry({ action: 'Add Employee', count: employees.length, status: 'Success', type: 'quick', details })
+    clearQuickAddDraft()
+    setHasDraftOnDisk(false)
     navigate('/')
+  }
+
+  const applyDraftFromPayload = (d) => {
+    if (!d?.employees?.length) return false
+    suppressPremiumStaleOnce.current = true
+    const restored = d.employees
+    setEmployees(restored)
+    const tab = Math.min(Math.max(0, d.activeTab ?? 0), restored.length - 1)
+    setActiveTab(tab)
+    if (d.uiVariation === 'variation1' || d.uiVariation === 'variation2') {
+      setUiVariation(d.uiVariation)
+    }
+    const expanded =
+      restored.find((e) => e.id === d.expandedId)?.id ?? restored[tab]?.id ?? restored[0].id
+    setExpandedId(expanded)
+    setPremiumFlow('fresh')
+    return true
+  }
+
+  const showDraftToast = (message) => {
+    setDraftBanner(message)
+    if (draftBannerTimer.current) clearTimeout(draftBannerTimer.current)
+    draftBannerTimer.current = setTimeout(() => setDraftBanner(''), 3500)
+  }
+
+  const handleRestoreDraft = () => {
+    if (!draftOffer?.employees?.length) return
+    applyDraftFromPayload(draftOffer)
+    setDraftOffer(null)
+    showDraftToast('Draft restored.')
+  }
+
+  const handleLoadDraftFromDisk = () => {
+    const d = loadQuickAddDraft()
+    if (!applyDraftFromPayload(d)) return
+    setDraftOffer(null)
+    showDraftToast('Draft loaded from this device.')
+  }
+
+  const handleClearDraft = () => {
+    clearQuickAddDraft()
+    setHasDraftOnDisk(false)
+    setDraftOffer(null)
+    showDraftToast('Saved draft removed from this device.')
   }
 
   const renderAccordionView = () => (
     <div className="space-y-3">
       {employees.map((emp, idx) => {
         const isOpen = expandedId === emp.id
-        const errors = validate(emp)
-        const touched = touchedMap[emp.id] || {}
         const filled = isFilled(emp)
         const basicDone = isBasicComplete(emp)
         const plansDone = hasPlans(emp)
         const depsCount = emp.dependents.length
         const completed = fieldCount(emp)
-        const showError = (field) => touched[field] && errors[field]
-        const hasAnyError = Object.keys(touched).length > 0 && Object.keys(errors).length > 0
+        const hasValidationErrors = employeeHasAnyValidationIssue(emp)
 
         return (
-          <div key={emp.id} className={`bg-white border rounded-xl overflow-hidden transition-all ${isOpen ? 'border-indigo-300 shadow-md ring-1 ring-indigo-100' : basicDone ? 'border-emerald-200' : hasAnyError ? 'border-red-200' : 'border-gray-200 hover:border-gray-300'}`}>
+          <div key={emp.id} className={`bg-white border rounded-xl overflow-hidden transition-all ${isOpen ? 'border-indigo-300 shadow-md ring-1 ring-indigo-100' : basicDone ? 'border-emerald-200' : hasValidationErrors ? 'border-red-200 ring-1 ring-red-100/50' : 'border-gray-200 hover:border-gray-300'}`}>
             {/* Accordion header */}
             <button
               onClick={() => toggleAccordion(emp.id)}
               className={`w-full flex items-center gap-3 px-5 py-4 text-left cursor-pointer transition-colors ${isOpen ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}`}
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors ${
-                basicDone ? 'bg-emerald-100' : hasAnyError ? 'bg-red-100' : 'bg-gray-100'
+                basicDone ? 'bg-emerald-100' : hasValidationErrors ? 'bg-red-100' : 'bg-gray-100'
               }`}>
                 {basicDone ? (
                   <CheckCircle size={20} className="text-emerald-600" />
-                ) : hasAnyError ? (
+                ) : hasValidationErrors ? (
                   <AlertCircle size={20} className="text-red-500" />
                 ) : (
                   <span className="text-sm font-bold text-gray-400">{idx + 1}</span>
@@ -478,56 +561,7 @@ export default function QuickAdd() {
             {/* Accordion body */}
             {isOpen && (
               <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-4">
-                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
-                      <div className={`${formSectionBadgeClass} ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                        {basicDone ? <CheckCircle size={14} /> : '1'}
-                      </div>
-                      Basic Information
-                    </h3>
-                    {basicDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Complete</span>}
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-4">
-                    <FormField label="Full Name" required value={emp.name} onChange={v => updateEmployee(idx, 'name', v)} placeholder="e.g. Rahul Sharma" error={showError('name')} />
-                    <FormField label="Employee ID" required value={emp.empId} onChange={v => updateEmployee(idx, 'empId', v)} placeholder="e.g. EMP001" error={showError('empId')} />
-                    <FormField label="Email" type="email" required value={emp.email} onChange={v => updateEmployee(idx, 'email', v)} placeholder="e.g. rahul@acko.com" error={showError('email')} />
-                    <FormField label="Date of Birth" type="date" required value={emp.dob} onChange={v => updateEmployee(idx, 'dob', v)} error={showError('dob')} />
-                    <SelectField label="Designation" required value={emp.designation} onChange={v => updateEmployee(idx, 'designation', v)} options={designations} placeholder="Select designation" error={showError('designation')} />
-                    <SelectField label="Gender" required value={emp.gender} onChange={v => updateEmployee(idx, 'gender', v)} options={['Male', 'Female', 'Other']} placeholder="Select gender" error={showError('gender')} />
-                    <FormField label="Date of Joining" type="date" required value={emp.doj} onChange={v => updateEmployee(idx, 'doj', v)} error={showError('doj')} />
-                    <FormField label="Mobile Number" type="tel" required value={emp.mobile} onChange={v => updateEmployee(idx, 'mobile', v)} placeholder="e.g. 9876543210" error={showError('mobile')} />
-                  </div>
-                </section>
-                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
-                      <div className={`${formSectionBadgeClass} ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                        {plansDone ? <CheckCircle size={14} /> : '2'}
-                      </div>
-                      Insurance Plans <span className="text-red-500 font-semibold">*</span>
-                    </h3>
-                    {plansDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Configured</span>}
-                  </div>
-                  <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} hideInsuranceHeader />
-                </section>
-                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
-                      <div className={`${formSectionBadgeClass} ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                        {depsCount > 0 ? <CheckCircle size={14} /> : <User size={14} />}
-                      </div>
-                      Dependents
-                    </h3>
-                    {depsCount > 0 && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{depsCount} added</span>}
-                  </div>
-                  <DependentForm
-                    dependents={emp.dependents}
-                    onChange={(deps) => updateEmployeeDeps(idx, deps)}
-                    employeePlans={emp.plans}
-                    hideSectionTitle
-                  />
-                </section>
+                {renderEmployeeForm(emp, idx)}
 
                 {/* Done action */}
                 {basicDone && employees.length < 5 && (
@@ -571,7 +605,8 @@ export default function QuickAdd() {
     >
       {employees.map((emp, idx) => {
         const basicDone = isBasicComplete(emp)
-        const hasAnyError = Object.keys(validate(emp)).length > 0
+        const hasAnyError = employeeHasAnyValidationIssue(emp)
+        const tabTip = hasAnyError ? formatEmployeeIssueTooltip(emp) : ''
         const isActive = activeTab === idx
         const tabId = `quickadd-emp-tab-${idx}`
 
@@ -585,10 +620,14 @@ export default function QuickAdd() {
               aria-controls="quickadd-emp-panel"
               tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTab(idx)}
+              title={tabTip || undefined}
+              aria-invalid={hasAnyError ? 'true' : undefined}
               className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 text-xs font-medium rounded-full border transition-colors min-h-[2.25rem] ${
                 isActive
                   ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200/60'
-                  : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-200 hover:bg-indigo-50/50'
+                  : hasAnyError
+                    ? 'bg-white text-gray-700 border-red-300 ring-1 ring-red-200/80 hover:border-red-300'
+                    : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-200 hover:bg-indigo-50/50'
               }`}
             >
               <span
@@ -672,10 +711,16 @@ export default function QuickAdd() {
     const plansDone = hasPlans(emp)
     const depsCount = emp.dependents.length
     const showError = (field) => touched[field] && errors[field]
+    const sec = sectionErrorFlags(emp)
+    const ringErr = (on) => (on ? 'ring-2 ring-red-200/90 border-red-200/90' : 'border-gray-200/90')
 
     return (
       <>
-        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500">
+        <section
+          id={`quickadd-${emp.id}-section-basic`}
+          data-section-has-error={sec.basic ? 'true' : 'false'}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500 ${ringErr(sec.basic)}`}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
               <div className={`${formSectionBadgeClass} ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
@@ -683,20 +728,30 @@ export default function QuickAdd() {
               </div>
               Basic Information
             </h3>
-            {basicDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Complete</span>}
+            <div className="flex items-center gap-2">
+              {sec.basic && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                  Needs fix
+                </span>
+              )}
+              {basicDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Complete</span>}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-4">
             <FormField label="Full Name" required value={emp.name} onChange={v => updateEmployee(idx, 'name', v)} placeholder="e.g. Rahul Sharma" error={showError('name')} />
             <FormField label="Employee ID" required value={emp.empId} onChange={v => updateEmployee(idx, 'empId', v)} placeholder="e.g. EMP001" error={showError('empId')} />
             <FormField label="Email" type="email" required value={emp.email} onChange={v => updateEmployee(idx, 'email', v)} placeholder="e.g. rahul@acko.com" error={showError('email')} />
             <FormField label="Date of Birth" type="date" required value={emp.dob} onChange={v => updateEmployee(idx, 'dob', v)} error={showError('dob')} />
-            <SelectField label="Designation" required value={emp.designation} onChange={v => updateEmployee(idx, 'designation', v)} options={designations} placeholder="Select designation" error={showError('designation')} />
             <SelectField label="Gender" required value={emp.gender} onChange={v => updateEmployee(idx, 'gender', v)} options={['Male', 'Female', 'Other']} placeholder="Select gender" error={showError('gender')} />
             <FormField label="Date of Joining" type="date" required value={emp.doj} onChange={v => updateEmployee(idx, 'doj', v)} error={showError('doj')} />
-            <FormField label="Mobile Number" type="tel" required value={emp.mobile} onChange={v => updateEmployee(idx, 'mobile', v)} placeholder="e.g. 9876543210" error={showError('mobile')} />
+            <FormField label="Mobile number" type="tel" optional value={emp.mobile} onChange={v => updateEmployee(idx, 'mobile', v)} placeholder="e.g. 9876543210" error={showError('mobile')} />
           </div>
         </section>
-        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500">
+        <section
+          id={`quickadd-${emp.id}-section-plans`}
+          data-section-has-error={sec.plans ? 'true' : 'false'}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500 ${ringErr(sec.plans)}`}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
               <div className={`${formSectionBadgeClass} ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
@@ -704,11 +759,22 @@ export default function QuickAdd() {
               </div>
               Insurance Plans <span className="text-red-500 font-semibold">*</span>
             </h3>
-            {plansDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Configured</span>}
+            <div className="flex items-center gap-2">
+              {sec.plans && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                  Needs fix
+                </span>
+              )}
+              {plansDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Configured</span>}
+            </div>
           </div>
           <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} hideInsuranceHeader />
         </section>
-        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500">
+        <section
+          id={`quickadd-${emp.id}-section-dependents`}
+          data-section-has-error={sec.dependents ? 'true' : 'false'}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500 ${ringErr(sec.dependents)}`}
+        >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
               <div className={`${formSectionBadgeClass} ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
@@ -716,7 +782,14 @@ export default function QuickAdd() {
               </div>
               Dependents
             </h3>
-            {depsCount > 0 && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{depsCount} added</span>}
+            <div className="flex items-center gap-2">
+              {sec.dependents && (
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-red-600 bg-red-50 px-2 py-0.5 rounded-md">
+                  Needs fix
+                </span>
+              )}
+              {depsCount > 0 && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{depsCount} added</span>}
+            </div>
           </div>
           <DependentForm
             dependents={emp.dependents}
@@ -769,55 +842,14 @@ export default function QuickAdd() {
 
   /** Sidebar rail: same section styling as Basic info / Plans (integrated form UI). */
   const renderCdSidebarFormPanel = () => (
-    <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-emerald-500">
-      <div className="mb-1">
-        <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
-          <span className={`${formSectionBadgeClass} bg-emerald-100 text-emerald-700`}>
-            <Wallet size={14} aria-hidden />
-          </span>
-          CD balance (est.)
-        </h3>
-        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
-          Live estimate of Corporate Deposit after this endorsement batch.
-        </p>
-      </div>
-      <div className="mt-4 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-gray-800">After this batch</span>
-          {cdAfterSubmit < 0 ? (
-            <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-red-600">
-              <AlertCircle size={14} aria-hidden /> Insufficient
-            </span>
-          ) : (
-            <span title="Sufficient CD for this batch (est.)">
-              <CheckCircle size={16} className="text-emerald-600" aria-hidden />
-            </span>
-          )}
-        </div>
-        <AnimatedCdAmount
-          value={cdAfterSubmit}
-          className="text-xl font-bold text-indigo-700 tabular-nums block"
-        >
-          {formatInrSigned(cdAfterSubmit)}
-        </AnimatedCdAmount>
-        <p className="text-sm text-gray-600 tabular-nums leading-snug">
-          <span className="text-gray-500">Current</span>{' '}
-          <AnimatedCdAmount value={MOCK_CD_AVAILABLE_RUPEES} className="font-semibold text-gray-900 inline">
-            {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
-          </AnimatedCdAmount>
-          <span className="text-gray-400"> · </span>
-          <span className="text-red-600 font-semibold">
-            −Est.{' '}
-            <AnimatedCdAmount value={estimatedCdDraw} className="font-semibold text-red-600 inline">
-              {formatInr(estimatedCdDraw)}
-            </AnimatedCdAmount>
-          </span>
-        </p>
-        <div className="rounded-lg border border-gray-100 bg-gray-50/90 p-3">
-          <CdBreakdownPopoverBody lines={cdBreakdownLines} />
-        </div>
-      </div>
-    </section>
+    <CdBalanceFormWidget
+      cdAfterSubmit={cdAfterSubmit}
+      currentCd={MOCK_CD_AVAILABLE_RUPEES}
+      estimatedCdDraw={estimatedCdDraw}
+      lines={cdBreakdownLines}
+      policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
+      primaryBatchCount={employees.length}
+    />
   )
 
   /** Bottom placement: full-width card with popover details. */
@@ -839,56 +871,16 @@ export default function QuickAdd() {
           Hide
         </button>
       </div>
-      <div className="px-3.5 py-3 sm:px-4 sm:py-3.5">
-        <div ref={cdPopoverRef} className="relative min-w-0">
-          {cdBreakdownOpen && (
-            <div className="absolute bottom-full left-0 z-50 mb-2 w-[min(100vw-3rem,280px)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-              <CdBreakdownPopoverBody lines={cdBreakdownLines} />
-            </div>
-          )}
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-sm font-semibold text-gray-800">After this batch</span>
-                <button
-                  type="button"
-                  onClick={() => setCdBreakdownOpen((o) => !o)}
-                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-white/80 cursor-pointer"
-                >
-                  <Info size={13} aria-hidden /> Details
-                </button>
-              </div>
-              {cdAfterSubmit < 0 ? (
-                <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-red-600">
-                  <AlertCircle size={15} aria-hidden /> Insufficient
-                </span>
-              ) : (
-                <span title="Sufficient CD for this batch (est.)">
-                  <CheckCircle size={16} className="text-emerald-600" aria-hidden />
-                </span>
-              )}
-            </div>
-            <AnimatedCdAmount
-              value={cdAfterSubmit}
-              className="text-xl sm:text-2xl font-bold text-indigo-700 tabular-nums truncate mt-2 block"
-            >
-              {formatInrSigned(cdAfterSubmit)}
-            </AnimatedCdAmount>
-            <p className="text-sm text-gray-600 tabular-nums leading-snug mt-2">
-              <span className="text-gray-500">Current</span>{' '}
-              <AnimatedCdAmount value={MOCK_CD_AVAILABLE_RUPEES} className="font-semibold text-gray-900 inline">
-                {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
-              </AnimatedCdAmount>
-              <span className="text-gray-400"> · </span>
-              <span className="text-red-600 font-semibold">
-                −Est.{' '}
-                <AnimatedCdAmount value={estimatedCdDraw} className="font-semibold text-red-600 inline">
-                  {formatInr(estimatedCdDraw)}
-                </AnimatedCdAmount>
-              </span>
-            </p>
-          </div>
-        </div>
+      <div className="px-3.5 py-3 sm:px-4 sm:py-3.5 bg-white/60">
+        <CdBalanceFormWidget
+          variant="embedded"
+          cdAfterSubmit={cdAfterSubmit}
+          currentCd={MOCK_CD_AVAILABLE_RUPEES}
+          estimatedCdDraw={estimatedCdDraw}
+          lines={cdBreakdownLines}
+          policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
+          primaryBatchCount={employees.length}
+        />
       </div>
     </div>
   )
@@ -899,11 +891,15 @@ export default function QuickAdd() {
         employees={employees}
         onExitReview={() => setShowPreview(false)}
         onSubmit={handleSubmit}
+        batchSummary={batchSummary}
         cdBreakdownLines={cdBreakdownLines}
         estimatedCdDraw={estimatedCdDraw}
         cdAfterSubmit={cdAfterSubmit}
         currentCd={MOCK_CD_AVAILABLE_RUPEES}
         policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
+        draftBanner={draftBanner}
+        onClearDraft={handleClearDraft}
+        hasDraftOnDisk={hasDraftOnDisk}
       />
     )
   }
@@ -950,10 +946,84 @@ export default function QuickAdd() {
               >
                 <Sparkles size={13} aria-hidden /> Prefill Data
               </button>
+              {hasDraftOnDisk && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleLoadDraftFromDisk}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-indigo-800 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 hover:border-indigo-300 transition-colors cursor-pointer"
+                    title="Replace the form with your last saved draft"
+                  >
+                    <FolderOpen size={13} aria-hidden /> Load draft
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearDraft}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-gray-600 bg-white border border-gray-200 rounded-lg hover:bg-red-50 hover:text-red-700 hover:border-red-200 transition-colors cursor-pointer"
+                    title="Delete the saved draft from this browser"
+                  >
+                    <Trash2 size={13} aria-hidden /> Clear draft
+                  </button>
+                </>
+              )}
             </div>
           }
         />
       </div>
+
+      {draftOffer && (
+        <div
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-xs text-amber-950"
+          role="status"
+        >
+          <span className="font-medium">
+            A saved draft is available on this device.
+            {draftOffer?.savedAt ? (
+              <span className="block sm:inline sm:ml-1 font-normal text-amber-900/80 mt-0.5 sm:mt-0">
+                Saved {formatDraftSavedLabel(draftOffer.savedAt)}.
+              </span>
+            ) : null}
+          </span>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleRestoreDraft}
+              className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-semibold hover:bg-amber-700 cursor-pointer"
+            >
+              Restore draft
+            </button>
+            <button
+              type="button"
+              onClick={() => setDraftOffer(null)}
+              className="px-3 py-1.5 rounded-lg border border-amber-300 bg-white font-semibold text-amber-900 hover:bg-amber-100/50 cursor-pointer"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+      {draftBanner && (
+        <div
+          className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900"
+          role="status"
+        >
+          {draftBanner}
+        </div>
+      )}
+
+      {errorBannerSummary.affectedCount > 0 && (
+        <div
+          className="mb-3 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950"
+          role="alert"
+          aria-live="polite"
+          title={errorBannerSummary.line}
+        >
+          <AlertCircle size={16} strokeWidth={2.25} className="shrink-0 text-amber-600" aria-hidden />
+          <span className="min-w-0 truncate whitespace-nowrap font-medium leading-tight text-amber-950">
+            {errorBannerSummary.line}
+          </span>
+        </div>
+      )}
 
       <div className="flex-1 min-h-0 flex flex-col min-h-0 rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
         {sidebarTabUnifiedChrome ? (
@@ -965,7 +1035,7 @@ export default function QuickAdd() {
                 </div>
               </div>
               <div
-                className="flex w-[min(19rem,32vw)] max-w-[21rem] shrink-0 items-center justify-end border-l border-gray-100 bg-white px-3 py-2 sm:px-4"
+                className={`flex ${CD_RAIL_WIDTH_CLASS} shrink-0 items-center justify-end border-l border-gray-100 bg-white px-3 py-2 sm:px-4`}
                 aria-label="CD balance controls"
               >
                 <div className="flex w-full min-w-0 justify-end">
@@ -984,7 +1054,7 @@ export default function QuickAdd() {
               </div>
               {cdBalanceVisible && (
                 <aside
-                  className="w-[min(19rem,32vw)] max-w-[21rem] shrink-0 overflow-y-auto overscroll-contain border-l border-gray-100 bg-white p-4 pt-3"
+                  className={`${CD_RAIL_WIDTH_CLASS} shrink-0 overflow-y-auto overscroll-contain border-l border-gray-100 bg-white p-4 pt-3`}
                   aria-label="CD balance estimate"
                 >
                   {renderCdSidebarFormPanel()}
@@ -1007,7 +1077,7 @@ export default function QuickAdd() {
             </div>
             {cdBalanceVisible && (
               <aside
-                className="w-[min(19rem,32vw)] max-w-[21rem] shrink-0 border-l border-gray-100 bg-white overflow-y-auto overscroll-contain"
+                className={`${CD_RAIL_WIDTH_CLASS} shrink-0 border-l border-gray-100 bg-white overflow-y-auto overscroll-contain`}
                 aria-label="CD balance estimate"
               >
                 <div className="sticky top-0 p-4">{renderCdSidebarFormPanel()}</div>
@@ -1035,51 +1105,53 @@ export default function QuickAdd() {
         )}
       </div>
 
-      {/* Sticky bottom: bottom CD (when placement is bottom or narrow sidebar mode) + batch summary + Preview */}
-      <div className="flex-shrink-0 sticky bottom-0 z-40 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] py-2.5">
-        {showFooterCdWidget && <div className="mb-3">{renderCdBottomWidget()}</div>}
-        {!cdBalanceVisible && !sidebarTabUnifiedChrome && (
-          <div className="mb-3 flex justify-start">
-            {renderCdBalanceHeaderCta({ isExpanded: false })}
-          </div>
-        )}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 w-full">
-          <p
-            className="text-[11px] sm:text-xs text-gray-600 leading-snug min-w-0 sm:flex-1 sm:max-w-md"
-            aria-live="polite"
-          >
-            <span className="font-semibold text-gray-800">{batchSummary.count}</span>
-            {' employee'}
-            {batchSummary.count !== 1 ? 's' : ''}
-            <span className="text-gray-300 mx-1.5">·</span>
-            <span className="font-medium text-gray-700">{batchSummary.basicsComplete}</span>
-            {' profile'}
-            {batchSummary.basicsComplete !== 1 ? 's' : ''} complete
-            <span className="text-gray-300 mx-1.5">·</span>
-            <span className="font-medium text-gray-700">{batchSummary.dependentCount}</span>
-            {' dependent'}
-            {batchSummary.dependentCount !== 1 ? 's' : ''}
-          </p>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 min-w-0 sm:flex-shrink-0 sm:ml-auto w-full sm:w-auto">
-            <button
-              type="button"
-              onClick={handlePreview}
-              className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem]"
-            >
-              <Eye size={18} strokeWidth={2.25} aria-hidden /> Preview &amp; Submit
-            </button>
-          </div>
-        </div>
-      </div>
+      <QuickAddBatchStickyFooter
+        beforeSummary={
+          <>
+            {showFooterCdWidget && <div className="mb-3">{renderCdBottomWidget()}</div>}
+            {!cdBalanceVisible && !sidebarTabUnifiedChrome && (
+              <div className="mb-3 flex justify-start">
+                {renderCdBalanceHeaderCta({ isExpanded: false })}
+              </div>
+            )}
+          </>
+        }
+        batchSummary={batchSummary}
+        actions={
+          <>
+            {(premiumFlow === 'fresh' || premiumFlow === 'stale') && (
+              <button
+                type="button"
+                onClick={handleCalculatePremium}
+                className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem]"
+              >
+                <Calculator size={18} strokeWidth={2.25} aria-hidden />
+                {premiumFlow === 'stale' ? 'Recalculate premium' : 'Calculate premium'}
+              </button>
+            )}
+            {premiumFlow === 'calculated' && (
+              <button
+                type="button"
+                onClick={handlePreview}
+                className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem]"
+              >
+                <Eye size={18} strokeWidth={2.25} aria-hidden /> Preview &amp; Submit
+              </button>
+            )}
+          </>
+        }
+      />
     </div>
   )
 }
 
-function FormField({ label, type = 'text', required, value, onChange, placeholder, error }) {
+function FormField({ label, type = 'text', required, optional, value, onChange, placeholder, error }) {
   return (
     <div>
       <label className={formFieldLabelClass}>
-        {label} {required && <span className="text-red-500">*</span>}
+        {label}{' '}
+        {optional && <span className="text-gray-400 font-normal">(Optional)</span>}
+        {required && <span className="text-red-500">*</span>}
       </label>
       <input
         type={type}

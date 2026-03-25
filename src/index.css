@@ -24,9 +24,9 @@ body {
     opacity: 1;
     transform: scale(1);
   }
-  35% {
-    opacity: 0.88;
-    transform: scale(1.04);
+  40% {
+    opacity: 1;
+    transform: scale(1.06);
   }
   100% {
     opacity: 1;
@@ -35,7 +35,21 @@ body {
 }
 
 .cd-amount-flash {
-  animation: cd-value-pulse 0.48s ease-out;
+  animation: cd-value-pulse 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes cd-panel-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0);
+  }
+  45% {
+    box-shadow: 0 0 0 3px rgb(16 185 129 / 0.22), 0 0 20px rgb(79 70 229 / 0.08);
+  }
+}
+
+.cd-balance-widget-flash {
+  animation: cd-panel-glow 0.7s ease-out;
 }
 
 input:focus, select:focus, textarea:focus {

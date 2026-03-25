@@ -1,8 +1,9 @@
-import { StrictMode, useEffect } from 'react'
+import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { HashRouter, useNavigate } from 'react-router-dom'
+import { HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App.jsx'
+import EnsureHashRoute from './EnsureHashRoute.jsx'
 
 /**
  * HashRouter reads routes from `location.hash` (e.g. `#/add/quick`) so the app works on GitHub Pages.
@@ -22,18 +23,6 @@ function redirectPathnameToHashIfNeeded() {
   window.location.replace(`${origin}/#${pathname}${search}`)
 }
 redirectPathnameToHashIfNeeded()
-
-/** Empty hash → `#/` so the dashboard loads. */
-function EnsureHashRoute() {
-  const navigate = useNavigate()
-  useEffect(() => {
-    const h = window.location.hash
-    if (h === '' || h === '#') {
-      navigate('/', { replace: true })
-    }
-  }, [navigate])
-  return null
-}
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

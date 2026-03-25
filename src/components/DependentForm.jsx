@@ -1,4 +1,5 @@
-import { Trash2, User, Heart, Users } from 'lucide-react'
+import { useRef } from 'react'
+import { Trash2, User, Heart, Users, Plus } from 'lucide-react'
 import { dependentRelationGroups, basePlans } from '../data/mockData'
 import { formFieldLabelClass, formControlClass, formHelperTextClass } from '../lib/formUi'
 import PlanSelection from './PlanSelection'
@@ -29,6 +30,7 @@ const PARENT_RELATIONS = ['Father', 'Mother']
 const INLAW_RELATIONS = ['Father-in-law', 'Mother-in-law']
 
 export default function DependentForm({ dependents, onChange, employeePlans = {}, hideSectionTitle = false }) {
+  const depIdSeq = useRef(0)
   const hasEmployeeGmc = !!(employeePlans?.gmcBasePlan)
   const secondaryActive = hasActiveSecondaryGmc(employeePlans)
   const hasParentDependent = dependents.some((d) => PARENT_RELATIONS.includes(d.relation))
@@ -94,7 +96,7 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
     onChange([
       ...dependents,
       {
-        id: Date.now(),
+        id: `dep-${++depIdSeq.current}`,
         name: '',
         relation,
         dob: '',
@@ -174,6 +176,7 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
         >
           {dependentRelationGroups.flatMap((grp) => grp.relations).map((r) => {
             const disabled = isRelationDisabled(r)
+            const added = showAddedCheckmark(r)
             return (
               <button
                 key={r}
@@ -181,14 +184,20 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
                 onClick={() => addDependentByRelation(r)}
                 disabled={disabled}
                 title={relationDisableTitle(r)}
-                className={`px-3.5 py-2 text-xs font-semibold rounded-full border transition-all min-h-[2.5rem] ${
+                aria-label={disabled ? `${r} (${relationDisableTitle(r) || 'unavailable'})` : `Add ${r}`}
+                className={
                   disabled
-                    ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                    : 'border-gray-200 bg-white text-gray-800 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800 cursor-pointer'
-                }`}
+                    ? added
+                      ? 'inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-emerald-200 bg-emerald-50/80 text-emerald-800 min-h-[2.5rem] cursor-not-allowed opacity-95'
+                      : 'inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-dashed border-gray-300 bg-gray-50/90 text-gray-500 min-h-[2.5rem] cursor-not-allowed'
+                    : 'inline-flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border-2 border-indigo-200 bg-white text-indigo-900 shadow-sm hover:shadow hover:border-indigo-400 hover:bg-indigo-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-1 transition-all min-h-[2.5rem] cursor-pointer'
+                }
               >
+                {!disabled && (
+                  <Plus size={15} strokeWidth={2.5} className="text-indigo-600 shrink-0" aria-hidden />
+                )}
                 {r}
-                {showAddedCheckmark(r) ? ' ✓' : ''}
+                {added ? ' ✓' : ''}
               </button>
             )
           })}
@@ -196,7 +205,7 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
       </div>
 
       {dependents.length === 0 ? (
-        <p className="text-xs text-gray-500 py-1">No dependents yet — tap a relationship chip above.</p>
+        <p className="text-xs text-gray-500 py-1">No dependents yet — click a relationship below to add one.</p>
       ) : (
         <div className="space-y-4">
           {dependents.map((dep, index) => (

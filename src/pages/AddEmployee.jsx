@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ClipboardList, Upload, ArrowRight } from 'lucide-react'
+import { ClipboardList, Upload, ArrowRight, FolderOpen } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
+import { hasQuickAddDraft, loadQuickAddDraft, formatDraftSavedLabel } from '../lib/quickAddDraft'
 
 const options = [
   {
@@ -23,6 +25,15 @@ const options = [
 
 export default function AddEmployee() {
   const navigate = useNavigate()
+  const [quickAddDraft, setQuickAddDraft] = useState(null)
+
+  useEffect(() => {
+    if (!hasQuickAddDraft()) {
+      setQuickAddDraft(null)
+      return
+    }
+    setQuickAddDraft(loadQuickAddDraft())
+  }, [])
 
   return (
     <div className="h-full overflow-y-auto px-6 lg:px-8 py-6">
@@ -31,6 +42,30 @@ export default function AddEmployee() {
         subtitle="Choose how you'd like to add new employees to the policy"
         breadcrumbs={[{ label: 'Add Employee' }]}
       />
+
+      {quickAddDraft?.employees?.length ? (
+        <div
+          className="mb-5 max-w-3xl rounded-xl border border-indigo-200 bg-indigo-50/80 px-4 py-3 flex flex-wrap items-center justify-between gap-3"
+          role="status"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-indigo-950">Quick Add draft on this device</p>
+            <p className="text-xs text-indigo-900/75 mt-0.5">
+              {quickAddDraft.employees.length} employee{quickAddDraft.employees.length === 1 ? '' : 's'} saved
+              {quickAddDraft.savedAt
+                ? ` · ${formatDraftSavedLabel(quickAddDraft.savedAt)}`
+                : ''}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/add/quick')}
+            className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 shadow-sm shrink-0 cursor-pointer"
+          >
+            <FolderOpen size={14} aria-hidden /> Resume Quick Add
+          </button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5 max-w-3xl">
         {options.map((opt) => {
