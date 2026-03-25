@@ -19,6 +19,25 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+@keyframes cd-value-pulse {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  35% {
+    opacity: 0.88;
+    transform: scale(1.04);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.cd-amount-flash {
+  animation: cd-value-pulse 0.48s ease-out;
+}
+
 input:focus, select:focus, textarea:focus {
   outline: none;
   box-shadow: 0 0 0 2px rgba(79, 70, 229, 0.2);

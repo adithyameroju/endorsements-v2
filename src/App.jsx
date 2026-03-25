@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import { EndorsementProvider } from './store/EndorsementStore'
 import EndorsementsDashboard from './pages/EndorsementsDashboard'
@@ -35,6 +35,8 @@ export default function App() {
           <Route path="/delete/quick" element={<QuickDelete />} />
           <Route path="/delete/bulk" element={<BulkDelete />} />
           <Route path="/hrms-sync" element={<HRMSSync />} />
+          {/* Sidebar links (Dashboard, Claims, etc.) point here until those pages exist */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Layout>
     </EndorsementProvider>

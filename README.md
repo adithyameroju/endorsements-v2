@@ -16,7 +16,8 @@ npm run dev
 ```
 
 Open **http://127.0.0.1:5173/** (terminal opens this for you).  
-If **`localhost:5173`** does not load, use **`127.0.0.1`** instead (common on macOS IPv6 vs IPv4).
+If **`localhost:5173`** does not load, use **`127.0.0.1`** instead (common on macOS IPv6 vs IPv4).  
+**Dev** uses normal paths (e.g. `/add/quick`); **production** on GitHub Pages still uses `#/…` in the URL.
 
 **Cursor:** *Terminal → Run Task → “Start app (Vite)”* or run `npm run dev` in the integrated terminal.
 

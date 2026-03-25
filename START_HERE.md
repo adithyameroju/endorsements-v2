@@ -23,7 +23,11 @@ npm run dev
 
 ### 2. Open the URL Vite prints
 
-**Primary:** **http://localhost:5173/**
+While developing (`npm run dev`), routes work like a normal site — **no `#` required**:
+
+**http://127.0.0.1:5173/** or **http://localhost:5173/**
+
+Examples: **http://127.0.0.1:5173/add/quick** for Quick Add.
 
 If that does not connect (some Mac setups resolve `localhost` to IPv6 only), run:
 
@@ -33,7 +37,7 @@ npm run dev:ip
 
 Then open **http://127.0.0.1:5173/**
 
-If the page stays **blank**, try **http://localhost:5173/#/** — the app also redirects an empty hash to `#/` after React loads.
+**Production** (GitHub Pages / `npm run preview` after build) still uses **hash URLs** like `https://…github.io/…/#/add/quick`.
 
 ---
 
