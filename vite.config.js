@@ -10,9 +10,12 @@ export default defineConfig(({ mode }) => ({
   server: {
     port: 5173,
     strictPort: false,
+    /** Listen on all interfaces so localhost / 127.0.0.1 / LAN IP all work */
+    host: true,
   },
   preview: {
     port: 4173,
     strictPort: false,
+    host: true,
   },
 }))

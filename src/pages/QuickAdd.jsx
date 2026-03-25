@@ -1,25 +1,35 @@
 import { useState, useMemo, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Plus, ChevronDown, ChevronLeft, Eye, CheckCircle, User, Trash2, ChevronUp, AlertCircle, Heart, Users, Sparkles, X, Shield, Wallet, Info } from 'lucide-react'
+import { Plus, ChevronDown, Eye, EyeOff, CheckCircle, User, Trash2, ChevronUp, AlertCircle, Sparkles, X, Wallet, Info } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
 import DependentForm from '../components/DependentForm'
-import { departments, designations, basePlans, gpaBasePlans } from '../data/mockData'
+import { designations, basePlans, gpaBasePlans } from '../data/mockData'
 import { cloneEmployeeGmcPlans } from '../lib/planHelpers'
+import AnimatedCdAmount from '../components/AnimatedCdAmount'
 import { formatInr, formatInrSigned } from '../lib/currencyFormat'
 import { useEndorsements } from '../store/EndorsementStore'
-import PremiumEstimateLivePanel from '../components/PremiumEstimateLivePanel'
+import QuickAddReviewScreen from '../components/QuickAddReviewScreen'
+import {
+  formSectionTitleClass,
+  formSectionBadgeClass,
+  formFieldLabelClass,
+  formControlClass,
+  formControlErrorClass,
+} from '../lib/formUi'
+
+const defaultGmcBaseId = basePlans[0]?.id || ''
 
 const emptyEmployee = () => ({
   id: Date.now(),
   name: '', empId: '', email: '', dob: '', designation: '',
-  gender: '', department: '', doj: '', mobile: '',
-  plans: {},
+  gender: '', doj: '', mobile: '',
+  plans: defaultGmcBaseId ? { gmcBasePlan: defaultGmcBaseId } : {},
   dependents: [],
 })
 
-const requiredFields = ['name', 'empId', 'email', 'dob', 'designation', 'gender', 'department', 'doj', 'mobile']
+const requiredFields = ['name', 'empId', 'email', 'dob', 'designation', 'gender', 'doj', 'mobile']
 
 function validate(emp) {
   const errors = {}
@@ -30,7 +40,6 @@ function validate(emp) {
   if (!emp.dob) errors.dob = 'Date of birth is required'
   if (!emp.designation) errors.designation = 'Designation is required'
   if (!emp.gender) errors.gender = 'Gender is required'
-  if (!emp.department) errors.department = 'Department is required'
   if (!emp.doj) errors.doj = 'Date of joining is required'
   if (!emp.mobile.trim()) errors.mobile = 'Mobile is required'
   else if (!/^\d{10}$/.test(emp.mobile)) errors.mobile = 'Must be 10 digits'
@@ -58,25 +67,27 @@ const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
 /** Illustrative policy context for Premium Estimate header */
 const MOCK_POLICY_DAYS_LEFT = 9
 
-const CD_DISPLAY_MODE_STORAGE_KEY = 'quickAdd_cdDisplayMode'
-const CD_LIVE_PANEL_OPEN_KEY = 'quickAdd_cdLivePanelOpen'
+const CD_BALANCE_VISIBLE_KEY = 'quickAdd_cdBalanceVisible'
+const CD_PLACEMENT_STORAGE_KEY = 'quickAdd_cdPlacement'
 
-function readStoredCdDisplayMode() {
+function readStoredCdBalanceVisible() {
   try {
-    const v = sessionStorage.getItem(CD_DISPLAY_MODE_STORAGE_KEY)
-    if (v === 'side_panel' || v === 'bottom_strip') return v
+    const v = sessionStorage.getItem(CD_BALANCE_VISIBLE_KEY)
+    if (v === '0') return false
   } catch {
     /* private mode / unavailable */
   }
-  return 'bottom_strip'
+  return true
 }
 
-function readStoredCdLivePanelOpen() {
+function readStoredCdPlacement() {
   try {
-    return sessionStorage.getItem(CD_LIVE_PANEL_OPEN_KEY) === '1'
+    const v = sessionStorage.getItem(CD_PLACEMENT_STORAGE_KEY)
+    if (v === 'sidebar' || v === 'bottom') return v
   } catch {
-    return false
+    /* private mode / unavailable */
   }
+  return 'bottom'
 }
 
 const CD_EST_PRIMARY_COMPLETE_RUPEES = 42_000
@@ -166,16 +177,13 @@ export default function QuickAdd() {
   const [touchedMap, setTouchedMap] = useState({})
   const [uiVariation, setUiVariation] = useState('variation2')
   const [activeTab, setActiveTab] = useState(0)
-  const [cdDisplayMode, setCdDisplayMode] = useState(readStoredCdDisplayMode)
+  const [cdBalanceVisible, setCdBalanceVisible] = useState(readStoredCdBalanceVisible)
+  const [cdPlacement, setCdPlacement] = useState(readStoredCdPlacement)
+  const [cdBreakdownOpen, setCdBreakdownOpen] = useState(false)
   const [isLgViewport, setIsLgViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
   )
-  const [cdLivePanelOpen, setCdLivePanelOpen] = useState(readStoredCdLivePanelOpen)
-  const [cdBreakdownOpen, setCdBreakdownOpen] = useState(false)
-  const [cdPreviewBreakdownOpen, setCdPreviewBreakdownOpen] = useState(false)
   const cdPopoverRef = useRef(null)
-  const cdPreviewPopoverRef = useRef(null)
-  const bottomCdSectionRef = useRef(null)
 
   const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines } = useMemo(() => {
     const { total, lines } = estimateCdDrawBreakdown(employees)
@@ -186,8 +194,16 @@ export default function QuickAdd() {
     }
   }, [employees])
 
-  const showSidePanel = cdDisplayMode === 'side_panel' && isLgViewport
-  const showBottomCd = cdDisplayMode === 'bottom_strip' || (cdDisplayMode === 'side_panel' && !isLgViewport)
+  const batchSummary = useMemo(() => {
+    const count = employees.length
+    const basicsComplete = employees.filter(isBasicComplete).length
+    const dependentCount = employees.reduce((sum, e) => sum + (e.dependents?.length || 0), 0)
+    return { count, basicsComplete, dependentCount }
+  }, [employees])
+
+  useEffect(() => {
+    setActiveTab((t) => Math.min(t, Math.max(0, employees.length - 1)))
+  }, [employees.length])
 
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)')
@@ -197,94 +213,44 @@ export default function QuickAdd() {
     return () => mq.removeEventListener('change', onChange)
   }, [])
 
-  const handleCdDisplayModeChange = (value) => {
-    setCdDisplayMode(value)
-    if (value === 'side_panel') {
-      setCdBreakdownOpen(false)
-      setCdLivePanelOpen(false)
-      try {
-        sessionStorage.setItem(CD_LIVE_PANEL_OPEN_KEY, '0')
-      } catch {
-        /* ignore */
-      }
-    }
+  /** Sidebar rail on large screens (accordion + tab each keep their own layout below). */
+  const showFormSidebarCd = cdPlacement === 'sidebar' && isLgViewport
+  /** Unified chrome: full-width header (tabs | CD CTA) + rail under CTA — only Sidebar CD + Tab view + lg. */
+  const sidebarTabUnifiedChrome = cdPlacement === 'sidebar' && uiVariation === 'variation2' && isLgViewport
+  const showFooterCd = cdPlacement === 'bottom' || (cdPlacement === 'sidebar' && !isLgViewport)
+  /** Omit bottom sticky CD only for sidebar+tab+lg (CD lives in header + rail). Other combos unchanged. */
+  const showFooterCdWidget =
+    showFooterCd && cdBalanceVisible && !sidebarTabUnifiedChrome
+
+  const persistCdPlacement = (value) => {
+    setCdPlacement(value)
+    setCdBreakdownOpen(false)
     try {
-      sessionStorage.setItem(CD_DISPLAY_MODE_STORAGE_KEY, value)
+      sessionStorage.setItem(CD_PLACEMENT_STORAGE_KEY, value)
     } catch {
       /* ignore */
     }
   }
 
-  const persistCdLivePanelOpen = (open) => {
-    setCdLivePanelOpen(open)
+  const persistCdBalanceVisible = (visible) => {
+    setCdBalanceVisible(visible)
     try {
-      sessionStorage.setItem(CD_LIVE_PANEL_OPEN_KEY, open ? '1' : '0')
+      sessionStorage.setItem(CD_BALANCE_VISIBLE_KEY, visible ? '1' : '0')
     } catch {
       /* ignore */
     }
   }
 
   useEffect(() => {
-    if (!cdBreakdownOpen && !cdPreviewBreakdownOpen) return
+    if (!cdBreakdownOpen) return
     const onPointerDown = (e) => {
       const t = e.target
       if (cdPopoverRef.current?.contains(t)) return
-      if (cdPreviewPopoverRef.current?.contains(t)) return
       setCdBreakdownOpen(false)
-      setCdPreviewBreakdownOpen(false)
     }
     document.addEventListener('mousedown', onPointerDown)
     return () => document.removeEventListener('mousedown', onPointerDown)
-  }, [cdBreakdownOpen, cdPreviewBreakdownOpen])
-
-  const handleCdToolbarCtaClick = () => {
-    if (showBottomCd) {
-      setCdBreakdownOpen(true)
-      bottomCdSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-      return
-    }
-    persistCdLivePanelOpen(!cdLivePanelOpen)
-  }
-
-  const cdToolbarCtaTitle = !showBottomCd
-    ? cdLivePanelOpen
-      ? 'Hide CD balance panel'
-      : 'Show CD balance panel'
-    : 'View CD balance in footer'
-
-  const renderCdToolbarCta = () => (
-    <button
-      type="button"
-      onClick={handleCdToolbarCtaClick}
-      title={cdToolbarCtaTitle}
-      className="inline-flex items-center gap-1.5 max-w-[11rem] sm:max-w-[13rem] pl-2 pr-2 py-2 rounded-lg border border-emerald-200/90 bg-emerald-50/80 hover:bg-emerald-50 transition-colors cursor-pointer text-left min-w-0 flex-shrink-0"
-      aria-label={cdToolbarCtaTitle}
-      aria-expanded={!showBottomCd ? cdLivePanelOpen : undefined}
-    >
-      <Wallet size={14} className="text-emerald-700 flex-shrink-0" aria-hidden />
-      <span className="min-w-0 flex flex-col items-start leading-tight">
-        <span className="text-[9px] font-semibold text-emerald-800 uppercase tracking-wide">CD</span>
-        <span
-          className="text-xs font-bold text-indigo-700 tabular-nums truncate w-full"
-          title={formatInrSigned(cdAfterSubmit)}
-        >
-          {formatInrSigned(cdAfterSubmit)}
-        </span>
-      </span>
-      {cdAfterSubmit < 0 ? (
-        <AlertCircle size={14} className="text-red-600 flex-shrink-0" aria-hidden />
-      ) : (
-        <CheckCircle size={14} className="text-emerald-600 flex-shrink-0" aria-hidden />
-      )}
-      {!showBottomCd && (
-        <ChevronDown
-          size={16}
-          className={`text-emerald-800 flex-shrink-0 transition-transform duration-200 ${cdLivePanelOpen ? 'rotate-180' : ''}`}
-          aria-hidden
-        />
-      )}
-    </button>
-  )
+  }, [cdBreakdownOpen])
 
   const updateEmployee = (index, field, value) => {
     const updated = [...employees]
@@ -324,7 +290,13 @@ export default function QuickAdd() {
 
   const removeEmployee = (index) => {
     if (employees.length <= 1) return
+    const n = employees.length
     const removed = employees[index]
+    setActiveTab((prev) => {
+      if (prev > index) return prev - 1
+      if (prev === index && index === n - 1) return Math.max(0, prev - 1)
+      return prev
+    })
     const updated = employees.filter((_, i) => i !== index)
     setEmployees(updated)
     if (expandedId === removed.id) {
@@ -372,7 +344,6 @@ export default function QuickAdd() {
         dob: '1990-05-15',
         designation: 'Software Engineer',
         gender: 'Male',
-        department: 'Engineering',
         doj: '2026-03-20',
         mobile: '9876543210',
         plans: {
@@ -402,7 +373,6 @@ export default function QuickAdd() {
         dob: '1988-12-03',
         designation: 'Product Manager',
         gender: 'Female',
-        department: 'Product',
         doj: '2026-03-25',
         mobile: '9876543211',
         plans: {
@@ -433,7 +403,6 @@ export default function QuickAdd() {
     const details = employees.map(emp => ({
       name: emp.name,
       id: emp.empId,
-      department: emp.department,
       designation: emp.designation,
     }))
     addEntry({ action: 'Add Employee', count: employees.length, status: 'Success', type: 'quick', details })
@@ -478,9 +447,7 @@ export default function QuickAdd() {
                     {emp.name || `Employee ${idx + 1}`}
                   </p>
                   {!isOpen && filled && (
-                    <span className="text-xs text-gray-400 truncate hidden sm:inline">
-                      {emp.empId} &middot; {emp.department || 'No dept'}
-                    </span>
+                    <span className="text-xs text-gray-400 truncate hidden sm:inline">{emp.empId}</span>
                   )}
                 </div>
                 {/* Section status pills (collapsed) */}
@@ -511,15 +478,15 @@ export default function QuickAdd() {
             {/* Accordion body */}
             {isOpen && (
               <div className="border-t border-gray-100 px-5 pb-5 pt-4 space-y-4">
-                <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+                      <div className={`${formSectionBadgeClass} ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                         {basicDone ? <CheckCircle size={14} /> : '1'}
                       </div>
                       Basic Information
                     </h3>
-                    {basicDone && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Complete</span>}
+                    {basicDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Complete</span>}
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-4">
                     <FormField label="Full Name" required value={emp.name} onChange={v => updateEmployee(idx, 'name', v)} placeholder="e.g. Rahul Sharma" error={showError('name')} />
@@ -528,32 +495,31 @@ export default function QuickAdd() {
                     <FormField label="Date of Birth" type="date" required value={emp.dob} onChange={v => updateEmployee(idx, 'dob', v)} error={showError('dob')} />
                     <SelectField label="Designation" required value={emp.designation} onChange={v => updateEmployee(idx, 'designation', v)} options={designations} placeholder="Select designation" error={showError('designation')} />
                     <SelectField label="Gender" required value={emp.gender} onChange={v => updateEmployee(idx, 'gender', v)} options={['Male', 'Female', 'Other']} placeholder="Select gender" error={showError('gender')} />
-                    <SelectField label="Department" required value={emp.department} onChange={v => updateEmployee(idx, 'department', v)} options={departments} placeholder="Select department" error={showError('department')} />
                     <FormField label="Date of Joining" type="date" required value={emp.doj} onChange={v => updateEmployee(idx, 'doj', v)} error={showError('doj')} />
                     <FormField label="Mobile Number" type="tel" required value={emp.mobile} onChange={v => updateEmployee(idx, 'mobile', v)} placeholder="e.g. 9876543210" error={showError('mobile')} />
                   </div>
                 </section>
-                <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+                      <div className={`${formSectionBadgeClass} ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                         {plansDone ? <CheckCircle size={14} /> : '2'}
                       </div>
-                      Insurance Plans
+                      Insurance Plans <span className="text-red-500 font-semibold">*</span>
                     </h3>
-                    {plansDone && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Configured</span>}
+                    {plansDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Configured</span>}
                   </div>
-                  <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} />
+                  <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} hideInsuranceHeader />
                 </section>
-                <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+                <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500">
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                    <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+                      <div className={`${formSectionBadgeClass} ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                         {depsCount > 0 ? <CheckCircle size={14} /> : <User size={14} />}
                       </div>
                       Dependents
                     </h3>
-                    {depsCount > 0 && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{depsCount} added</span>}
+                    {depsCount > 0 && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{depsCount} added</span>}
                   </div>
                   <DependentForm
                     dependents={emp.dependents}
@@ -596,41 +562,71 @@ export default function QuickAdd() {
     </div>
   )
 
-  /** Tab strip only — stays fixed; form scrolls below. */
+  /** Tab strip — fixed above scroll; form is tabpanel below. */
   const renderTabStrip = () => (
-    <div className="flex items-center gap-2 p-1 bg-gray-100 rounded-lg w-fit max-w-full flex-wrap">
+    <div
+      className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full min-w-0 sm:overflow-x-auto sm:[scrollbar-width:thin]"
+      role="tablist"
+      aria-label="Employees"
+    >
       {employees.map((emp, idx) => {
         const basicDone = isBasicComplete(emp)
         const hasAnyError = Object.keys(validate(emp)).length > 0
         const isActive = activeTab === idx
+        const tabId = `quickadd-emp-tab-${idx}`
 
         return (
-          <div key={emp.id} className="relative">
+          <div key={emp.id} className="relative flex-shrink-0">
             <button
               type="button"
+              id={tabId}
+              role="tab"
+              aria-selected={isActive}
+              aria-controls="quickadd-emp-panel"
+              tabIndex={isActive ? 0 : -1}
               onClick={() => setActiveTab(idx)}
-              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-md transition-all ${
+              className={`flex items-center gap-1.5 pl-2 pr-2.5 py-1.5 text-xs font-medium rounded-full border transition-colors min-h-[2.25rem] ${
                 isActive
-                  ? 'bg-white text-indigo-700 shadow-sm font-semibold'
-                  : 'text-gray-600 hover:text-gray-800 hover:bg-gray-200/50'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm ring-2 ring-indigo-200/60'
+                  : 'bg-white text-gray-700 border-gray-200 hover:border-indigo-200 hover:bg-indigo-50/50'
               }`}
             >
-              <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
-                basicDone ? 'bg-emerald-100 text-emerald-600' : hasAnyError ? 'bg-red-100 text-red-500' : 'bg-gray-200 text-gray-500'
-              }`}>
-                {basicDone ? <CheckCircle size={10} /> : hasAnyError ? <AlertCircle size={10} /> : idx + 1}
-              </div>
-              <span className="hidden sm:inline truncate max-w-20">
-                {emp.name ? emp.name.split(' ')[0] : `Emp ${idx + 1}`}
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold ${
+                  isActive
+                    ? 'bg-white/20 text-white'
+                    : basicDone
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : hasAnyError
+                        ? 'bg-red-100 text-red-600'
+                        : 'bg-gray-100 text-gray-500'
+                }`}
+              >
+                {isActive ? (
+                  idx + 1
+                ) : basicDone ? (
+                  <CheckCircle size={11} strokeWidth={2.5} />
+                ) : hasAnyError ? (
+                  <AlertCircle size={11} strokeWidth={2.5} />
+                ) : (
+                  idx + 1
+                )}
+              </span>
+              <span className="max-w-[6rem] sm:max-w-[8.5rem] truncate">
+                {emp.name ? emp.name.split(' ')[0] : `Employee ${idx + 1}`}
               </span>
             </button>
             {employees.length > 1 && (
               <button
                 type="button"
-                onClick={() => { removeEmployee(idx); if (activeTab >= idx && activeTab > 0) setActiveTab(activeTab - 1) }}
-                className="absolute -top-1 -right-1 w-4 h-4 bg-red-100 hover:bg-red-200 text-red-500 rounded-full flex items-center justify-center text-xs"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  removeEmployee(idx)
+                }}
+                className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-white border border-red-200 text-red-500 hover:bg-red-50 shadow-sm z-10"
+                aria-label={`Remove employee ${idx + 1}`}
               >
-                <X size={8} />
+                <X size={11} strokeWidth={2.5} />
               </button>
             )}
           </div>
@@ -639,11 +635,15 @@ export default function QuickAdd() {
       {employees.length < 5 && (
         <button
           type="button"
-          onClick={() => { addEmployee(); setActiveTab(employees.length) }}
-          className="flex items-center gap-1 px-3 py-2 text-sm font-medium text-gray-500 hover:text-indigo-600 hover:bg-gray-200/50 rounded-md transition-colors"
+          onClick={() => {
+            const nextIndex = employees.length
+            addEmployee()
+            setActiveTab(nextIndex)
+          }}
+          className="inline-flex items-center gap-1 rounded-full border border-dashed border-gray-300 bg-gray-50 px-2 py-1.5 text-xs font-semibold text-gray-600 hover:border-indigo-300 hover:bg-indigo-50/60 hover:text-indigo-700 transition-colors min-h-[2.25rem] flex-shrink-0"
         >
-          <Plus size={14} />
-          <span className="hidden sm:inline text-xs">Add</span>
+          <Plus size={12} strokeWidth={2.5} className="flex-shrink-0" aria-hidden />
+          <span className="whitespace-nowrap">Add employee {employees.length + 1}/5</span>
         </button>
       )}
     </div>
@@ -675,15 +675,15 @@ export default function QuickAdd() {
 
     return (
       <>
-        <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+            <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+              <div className={`${formSectionBadgeClass} ${basicDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                 {basicDone ? <CheckCircle size={14} /> : '1'}
               </div>
               Basic Information
             </h3>
-            {basicDone && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Complete</span>}
+            {basicDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Complete</span>}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-x-5 gap-y-4">
             <FormField label="Full Name" required value={emp.name} onChange={v => updateEmployee(idx, 'name', v)} placeholder="e.g. Rahul Sharma" error={showError('name')} />
@@ -692,32 +692,31 @@ export default function QuickAdd() {
             <FormField label="Date of Birth" type="date" required value={emp.dob} onChange={v => updateEmployee(idx, 'dob', v)} error={showError('dob')} />
             <SelectField label="Designation" required value={emp.designation} onChange={v => updateEmployee(idx, 'designation', v)} options={designations} placeholder="Select designation" error={showError('designation')} />
             <SelectField label="Gender" required value={emp.gender} onChange={v => updateEmployee(idx, 'gender', v)} options={['Male', 'Female', 'Other']} placeholder="Select gender" error={showError('gender')} />
-            <SelectField label="Department" required value={emp.department} onChange={v => updateEmployee(idx, 'department', v)} options={departments} placeholder="Select department" error={showError('department')} />
             <FormField label="Date of Joining" type="date" required value={emp.doj} onChange={v => updateEmployee(idx, 'doj', v)} error={showError('doj')} />
             <FormField label="Mobile Number" type="tel" required value={emp.mobile} onChange={v => updateEmployee(idx, 'mobile', v)} placeholder="e.g. 9876543210" error={showError('mobile')} />
           </div>
         </section>
-        <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+            <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+              <div className={`${formSectionBadgeClass} ${plansDone ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                 {plansDone ? <CheckCircle size={14} /> : '2'}
               </div>
-              Insurance Plans
+              Insurance Plans <span className="text-red-500 font-semibold">*</span>
             </h3>
-            {plansDone && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">Configured</span>}
+            {plansDone && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">Configured</span>}
           </div>
-          <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} />
+          <PlanSelection plans={emp.plans} onChange={(plans) => updateEmployeePlans(idx, plans)} label={`emp-${idx}`} hideInsuranceHeader />
         </section>
-        <section className="bg-amber-50/40 rounded-xl p-5 border border-amber-100/60">
+        <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2.5">
-              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
+            <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+              <div className={`${formSectionBadgeClass} ${depsCount > 0 ? 'bg-emerald-100 text-emerald-600' : 'bg-indigo-100 text-indigo-600'}`}>
                 {depsCount > 0 ? <CheckCircle size={14} /> : <User size={14} />}
               </div>
               Dependents
             </h3>
-            {depsCount > 0 && <span className="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">{depsCount} added</span>}
+            {depsCount > 0 && <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">{depsCount} added</span>}
           </div>
           <DependentForm
             dependents={emp.dependents}
@@ -730,124 +729,191 @@ export default function QuickAdd() {
     )
   }
 
-  if (showPreview) {
-    return (
-      <div className="h-full overflow-y-auto px-6 lg:px-8 py-4">
-        <PageHeader
-          title="Review & Submit"
-          subtitle="Review all employee details before submitting"
-          breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Quick Add', path: '/add/quick' }, { label: 'Preview' }]}
-          trailing={<Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={2} compact />}
-        />
-        <button onClick={() => setShowPreview(false)} className="mb-4 inline-flex items-center gap-1.5 text-sm text-indigo-600 font-medium hover:text-indigo-700 cursor-pointer">
-          <ChevronLeft size={16} /> Back to editing
-        </button>
-        <div className="space-y-4">
-          {employees.map((emp, idx) => (
-            <div key={emp.id} className="bg-white border border-gray-200 rounded-xl p-5">
-              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-100">
-                <div className="w-9 h-9 bg-indigo-100 rounded-full flex items-center justify-center"><User size={18} className="text-indigo-600" /></div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">{emp.name || `Employee ${idx + 1}`}</h3>
-                  <p className="text-xs text-gray-500">{emp.empId} &middot; {emp.department}</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-x-6 gap-y-2.5 text-sm">
-                <PF label="Email" value={emp.email} />
-                <PF label="DOB" value={emp.dob} />
-                <PF label="Gender" value={emp.gender} />
-                <PF label="Designation" value={emp.designation} />
-                <PF label="Department" value={emp.department} />
-                <PF label="Joining" value={emp.doj} />
-                <PF label="Mobile" value={emp.mobile} />
-              </div>
-              {(emp.plans?.gmcBasePlan || emp.plans?.gpaBasePlan) && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 mb-2">Plans</p>
-                  <div className="flex flex-wrap gap-3 text-sm">
-                    {emp.plans?.gmcBasePlan && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 rounded-lg border border-blue-100">
-                        <Heart size={14} className="text-blue-600" />
-                        <span className="text-gray-900">GMC: {basePlans.find(p => p.id === emp.plans.gmcBasePlan)?.name || emp.plans.gmcBasePlan}</span>
-                      </span>
-                    )}
-                    {emp.plans?.gpaBasePlan && (
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1.5 bg-violet-50 rounded-lg border border-violet-100">
-                        <Shield size={14} className="text-violet-600" />
-                        <span className="text-gray-900">GPA: {gpaBasePlans.find(p => p.id === emp.plans.gpaBasePlan)?.name || emp.plans.gpaBasePlan}</span>
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-              {emp.dependents.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <p className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1.5"><User size={12} className="text-indigo-500" /> Dependents ({emp.dependents.length})</p>
-                  <div className="flex flex-wrap gap-2">
-                    {emp.dependents.map((dep, di) => (
-                      <div key={di} className="inline-flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
-                        <span className="text-indigo-500">{getRelationIcon(dep.relation)}</span>
-                        <span className="text-sm text-gray-900">{dep.name || '—'}</span>
-                        <span className="text-xs text-gray-500">({dep.relation || '—'})</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ))}
+  /**
+   * Default CD header CTA: same pill whether widget is open or closed.
+   * Closed: Eye (view). Open: EyeOff (eye with slash) to dismiss.
+   */
+  const renderCdBalanceHeaderCta = ({ withStartDivider = false, isExpanded = false } = {}) => {
+    const btn = (
+      <button
+        type="button"
+        onClick={() => persistCdBalanceVisible(!isExpanded)}
+        className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-emerald-200/90 bg-emerald-50/90 px-2.5 py-2 text-left transition-colors hover:bg-emerald-100/90 cursor-pointer sm:px-3"
+        aria-label={
+          isExpanded ? 'Close CD balance view' : 'View CD balance — after batch estimate'
+        }
+        title={isExpanded ? 'Close CD balance view' : 'View CD balance'}
+      >
+        <Wallet size={17} className="shrink-0 text-emerald-700" aria-hidden />
+        <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span className="shrink-0 text-xs font-bold text-emerald-900">CD balance:</span>
+          <AnimatedCdAmount
+            value={cdAfterSubmit}
+            className="min-w-0 truncate text-sm font-bold text-indigo-700 tabular-nums"
+          >
+            {formatInrSigned(cdAfterSubmit)}
+          </AnimatedCdAmount>
+        </span>
+        {isExpanded ? (
+          <EyeOff size={17} className="shrink-0 text-emerald-700" aria-hidden />
+        ) : (
+          <Eye size={17} className="shrink-0 text-emerald-700" aria-hidden />
+        )}
+      </button>
+    )
+    if (withStartDivider) {
+      return <div className="ml-0.5 border-l border-gray-200 pl-3">{btn}</div>
+    }
+    return btn
+  }
+
+  /** Sidebar rail: same section styling as Basic info / Plans (integrated form UI). */
+  const renderCdSidebarFormPanel = () => (
+    <section className="rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-emerald-500">
+      <div className="mb-1">
+        <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
+          <span className={`${formSectionBadgeClass} bg-emerald-100 text-emerald-700`}>
+            <Wallet size={14} aria-hidden />
+          </span>
+          CD balance (est.)
+        </h3>
+        <p className="text-xs text-gray-500 mt-2 leading-relaxed">
+          Live estimate of Corporate Deposit after this endorsement batch.
+        </p>
+      </div>
+      <div className="mt-4 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-gray-800">After this batch</span>
+          {cdAfterSubmit < 0 ? (
+            <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-red-600">
+              <AlertCircle size={14} aria-hidden /> Insufficient
+            </span>
+          ) : (
+            <span title="Sufficient CD for this batch (est.)">
+              <CheckCircle size={16} className="text-emerald-600" aria-hidden />
+            </span>
+          )}
         </div>
-        <div
-          ref={cdPreviewPopoverRef}
-          className="relative mt-5 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-4 py-3"
+        <AnimatedCdAmount
+          value={cdAfterSubmit}
+          className="text-xl font-bold text-indigo-700 tabular-nums block"
         >
-          {cdPreviewBreakdownOpen && (
-            <div className="absolute bottom-full left-0 z-50 mb-2 w-full max-w-sm rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
+          {formatInrSigned(cdAfterSubmit)}
+        </AnimatedCdAmount>
+        <p className="text-sm text-gray-600 tabular-nums leading-snug">
+          <span className="text-gray-500">Current</span>{' '}
+          <AnimatedCdAmount value={MOCK_CD_AVAILABLE_RUPEES} className="font-semibold text-gray-900 inline">
+            {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
+          </AnimatedCdAmount>
+          <span className="text-gray-400"> · </span>
+          <span className="text-red-600 font-semibold">
+            −Est.{' '}
+            <AnimatedCdAmount value={estimatedCdDraw} className="font-semibold text-red-600 inline">
+              {formatInr(estimatedCdDraw)}
+            </AnimatedCdAmount>
+          </span>
+        </p>
+        <div className="rounded-lg border border-gray-100 bg-gray-50/90 p-3">
+          <CdBreakdownPopoverBody lines={cdBreakdownLines} />
+        </div>
+      </div>
+    </section>
+  )
+
+  /** Bottom placement: full-width card with popover details. */
+  const renderCdBottomWidget = () => (
+    <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/80 shadow-sm overflow-hidden">
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5 border-b border-emerald-200/60 bg-emerald-50/90">
+        <div className="flex items-center gap-2 min-w-0">
+          <Wallet size={17} className="text-emerald-700 flex-shrink-0" aria-hidden />
+          <h3 className="text-sm font-bold text-emerald-950 tracking-tight">CD balance (est.)</h3>
+        </div>
+        <button
+          type="button"
+          onClick={() => persistCdBalanceVisible(false)}
+          className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-emerald-900 hover:bg-white/70 border border-transparent hover:border-emerald-200/80 transition-colors cursor-pointer flex-shrink-0"
+          aria-label="Close CD balance view"
+          title="Close CD balance view"
+        >
+          <EyeOff size={15} aria-hidden />
+          Hide
+        </button>
+      </div>
+      <div className="px-3.5 py-3 sm:px-4 sm:py-3.5">
+        <div ref={cdPopoverRef} className="relative min-w-0">
+          {cdBreakdownOpen && (
+            <div className="absolute bottom-full left-0 z-50 mb-2 w-[min(100vw-3rem,280px)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
               <CdBreakdownPopoverBody lines={cdBreakdownLines} />
             </div>
           )}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide">CD balance</span>
-              <button
-                type="button"
-                onClick={() => setCdPreviewBreakdownOpen((o) => !o)}
-                className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-indigo-600 hover:bg-white/80 cursor-pointer"
-              >
-                <Info size={12} className="flex-shrink-0" aria-hidden /> Details
-              </button>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-sm font-semibold text-gray-800">After this batch</span>
+                <button
+                  type="button"
+                  onClick={() => setCdBreakdownOpen((o) => !o)}
+                  className="inline-flex items-center gap-0.5 rounded-md px-1.5 py-1 text-xs font-semibold text-indigo-600 hover:bg-white/80 cursor-pointer"
+                >
+                  <Info size={13} aria-hidden /> Details
+                </button>
+              </div>
+              {cdAfterSubmit < 0 ? (
+                <span className="inline-flex items-center gap-0.5 text-xs font-semibold text-red-600">
+                  <AlertCircle size={15} aria-hidden /> Insufficient
+                </span>
+              ) : (
+                <span title="Sufficient CD for this batch (est.)">
+                  <CheckCircle size={16} className="text-emerald-600" aria-hidden />
+                </span>
+              )}
             </div>
-            {cdAfterSubmit < 0 ? (
-              <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-red-600 flex-shrink-0">
-                <AlertCircle size={14} aria-hidden /> Insufficient
+            <AnimatedCdAmount
+              value={cdAfterSubmit}
+              className="text-xl sm:text-2xl font-bold text-indigo-700 tabular-nums truncate mt-2 block"
+            >
+              {formatInrSigned(cdAfterSubmit)}
+            </AnimatedCdAmount>
+            <p className="text-sm text-gray-600 tabular-nums leading-snug mt-2">
+              <span className="text-gray-500">Current</span>{' '}
+              <AnimatedCdAmount value={MOCK_CD_AVAILABLE_RUPEES} className="font-semibold text-gray-900 inline">
+                {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
+              </AnimatedCdAmount>
+              <span className="text-gray-400"> · </span>
+              <span className="text-red-600 font-semibold">
+                −Est.{' '}
+                <AnimatedCdAmount value={estimatedCdDraw} className="font-semibold text-red-600 inline">
+                  {formatInr(estimatedCdDraw)}
+                </AnimatedCdAmount>
               </span>
-            ) : (
-              <span className="flex-shrink-0" title="Sufficient CD for this batch (est.)">
-                <CheckCircle size={14} className="text-emerald-600" aria-hidden />
-              </span>
-            )}
+            </p>
           </div>
-          <p className="text-lg font-bold text-indigo-700 tabular-nums mt-1">{formatInrSigned(cdAfterSubmit)}</p>
-          <p className="text-[11px] text-gray-600 tabular-nums leading-snug mt-0.5">
-            <span className="text-gray-500">Current</span> {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
-            <span className="text-gray-400"> · </span>
-            <span className="text-red-600 font-medium">−Est. {formatInr(estimatedCdDraw)}</span>
-          </p>
-        </div>
-        <div className="flex justify-end gap-3 mt-4">
-          <button onClick={() => setShowPreview(false)} className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Edit</button>
-          <button onClick={handleSubmit} className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center gap-2 cursor-pointer"><CheckCircle size={16} /> Submit Endorsement</button>
         </div>
       </div>
+    </div>
+  )
+
+  if (showPreview) {
+    return (
+      <QuickAddReviewScreen
+        employees={employees}
+        onExitReview={() => setShowPreview(false)}
+        onSubmit={handleSubmit}
+        cdBreakdownLines={cdBreakdownLines}
+        estimatedCdDraw={estimatedCdDraw}
+        cdAfterSubmit={cdAfterSubmit}
+        currentCd={MOCK_CD_AVAILABLE_RUPEES}
+        policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
+      />
     )
   }
 
   return (
-    <div className="flex flex-col h-full px-6 lg:px-8 py-4">
-      <div className="flex-shrink-0 mb-3">
+    <div className="flex flex-col h-full min-h-0 px-6 lg:px-8 pt-4 pb-0">
+      <div className="flex-shrink-0 mb-2">
         <PageHeader
           title="Quick Add Employees"
-          subtitle="Add up to 5 employees with plan and dependent details"
+          subtitle="Up to 5 employees — plans and dependents"
           breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Quick Add' }]}
           trailing={<Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={1} compact />}
           navTrailing={
@@ -855,20 +921,27 @@ export default function QuickAdd() {
               <select
                 aria-label="Employee form layout"
                 value={uiVariation}
-                onChange={(e) => setUiVariation(e.target.value)}
+                onChange={(e) => {
+                  const v = e.target.value
+                  setUiVariation(v)
+                  if (v === 'variation2') {
+                    const i = employees.findIndex((emp) => emp.id === expandedId)
+                    setActiveTab(i === -1 ? 0 : i)
+                  }
+                }}
                 className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium max-w-[9rem]"
               >
                 <option value="variation2">Tab View</option>
                 <option value="variation1">Accordion View</option>
               </select>
               <select
-                aria-label="CD summary placement"
-                value={cdDisplayMode}
-                onChange={(e) => handleCdDisplayModeChange(e.target.value)}
-                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium max-w-[10rem]"
+                aria-label="CD balance placement"
+                value={cdPlacement}
+                onChange={(e) => persistCdPlacement(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg bg-white font-medium max-w-[11rem] sm:max-w-[13rem]"
               >
-                <option value="bottom_strip">CD: Bottom bar</option>
-                <option value="side_panel">CD: Live panel</option>
+                <option value="sidebar">Sidebar CD balance</option>
+                <option value="bottom">Bottom CD balance</option>
               </select>
               <button
                 type="button"
@@ -882,135 +955,118 @@ export default function QuickAdd() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col min-h-0">
-        {showSidePanel ? (
-          <div className="flex flex-1 min-h-0 flex-col rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
-            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-              <div className="flex flex-row items-start">
-                <div
-                  className={`flex-1 min-w-0 ${showSidePanel && cdLivePanelOpen ? 'border-r border-gray-100' : ''}`}
-                >
-                  {uiVariation === 'variation1' ? (
-                    <>
-                      <div className="sticky top-0 z-20 flex justify-end py-2.5 px-4 bg-white/95 backdrop-blur-sm border-b border-gray-100">
-                        {renderCdToolbarCta()}
-                      </div>
-                      <div className="px-4 pb-8 pt-4">{renderAccordionView()}</div>
-                    </>
-                  ) : (
-                    <>
-                      <div className="sticky top-0 z-20 flex items-center justify-between gap-3 py-2.5 px-4 bg-white/95 backdrop-blur-sm border-b border-gray-100">
-                        <div className="min-w-0 flex-1 overflow-x-auto pb-0.5">{renderTabStrip()}</div>
-                        {renderCdToolbarCta()}
-                      </div>
-                      <div className="px-4 pb-8 pt-4">{renderTabFormCard(true)}</div>
-                    </>
-                  )}
+      <div className="flex-1 min-h-0 flex flex-col min-h-0 rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
+        {sidebarTabUnifiedChrome ? (
+          <div className="flex flex-1 min-h-0 flex-col overflow-hidden min-w-0 bg-white">
+            <div className="flex flex-shrink-0 items-stretch border-b border-gray-100 bg-white z-20">
+              <div className="flex min-w-0 flex-1 items-center px-3 py-2 sm:px-4">
+                <div className="min-w-0 flex-1 overflow-x-auto sm:[scrollbar-width:thin]">
+                  {renderTabStrip()}
                 </div>
-                {showSidePanel && cdLivePanelOpen && (
-                  <aside className="shrink-0 sticky top-0 self-start max-h-[calc(100vh-7.5rem)] w-[min(22rem,calc(100vw-28rem))] flex flex-col border-l border-gray-100 bg-gradient-to-b from-gray-50/90 to-white">
-                    <div className="p-2 min-h-0 overflow-y-auto">
-                      <PremiumEstimateLivePanel
-                        lines={cdBreakdownLines}
-                        totalPremium={estimatedCdDraw}
-                        currentCd={MOCK_CD_AVAILABLE_RUPEES}
-                        balanceAfter={cdAfterSubmit}
-                        isSufficient={cdAfterSubmit >= 0}
-                        policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
-                        onCollapse={() => persistCdLivePanelOpen(false)}
-                        collapseAriaLabel="Close CD balance panel"
-                        collapseTitle="Close CD balance panel"
-                      />
-                    </div>
-                  </aside>
-                )}
+              </div>
+              <div
+                className="flex w-[min(19rem,32vw)] max-w-[21rem] shrink-0 items-center justify-end border-l border-gray-100 bg-white px-3 py-2 sm:px-4"
+                aria-label="CD balance controls"
+              >
+                <div className="flex w-full min-w-0 justify-end">
+                  {renderCdBalanceHeaderCta({ withStartDivider: false, isExpanded: cdBalanceVisible })}
+                </div>
               </div>
             </div>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-row overflow-hidden">
+              <div
+                className="min-w-0 flex-1 overflow-y-auto overscroll-contain px-4 pb-4 pt-3"
+                role="tabpanel"
+                id="quickadd-emp-panel"
+                aria-labelledby={`quickadd-emp-tab-${activeTab}`}
+              >
+                {renderTabFormCard(true)}
+              </div>
+              {cdBalanceVisible && (
+                <aside
+                  className="w-[min(19rem,32vw)] max-w-[21rem] shrink-0 overflow-y-auto overscroll-contain border-l border-gray-100 bg-white p-4 pt-3"
+                  aria-label="CD balance estimate"
+                >
+                  {renderCdSidebarFormPanel()}
+                </aside>
+              )}
+            </div>
+          </div>
+        ) : showFormSidebarCd ? (
+          /* Accordion + Sidebar CD + lg only (Tab + Sidebar + lg uses sidebarTabUnifiedChrome above). */
+          <div className="flex flex-1 min-h-0 flex-row overflow-hidden min-w-0">
+            <div className="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+              {cdBalanceVisible && (
+                <div className="z-20 flex flex-shrink-0 items-center justify-end gap-2 border-b border-gray-100 bg-white px-3 py-2 sm:px-4">
+                  {renderCdBalanceHeaderCta({ withStartDivider: true, isExpanded: true })}
+                </div>
+              )}
+              <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+                {renderAccordionView()}
+              </div>
+            </div>
+            {cdBalanceVisible && (
+              <aside
+                className="w-[min(19rem,32vw)] max-w-[21rem] shrink-0 border-l border-gray-100 bg-white overflow-y-auto overscroll-contain"
+                aria-label="CD balance estimate"
+              >
+                <div className="sticky top-0 p-4">{renderCdSidebarFormPanel()}</div>
+              </aside>
+            )}
+          </div>
+        ) : uiVariation === 'variation1' ? (
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3">
+            {renderAccordionView()}
           </div>
         ) : (
-          <>
-            {uiVariation === 'variation1' ? (
-              <>
-                <div className="flex-shrink-0 flex justify-end py-2 -mx-6 lg:-mx-8 px-6 lg:px-8 border-b border-gray-200/90 bg-gray-50/80">
-                  {renderCdToolbarCta()}
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto pb-4 pt-3">{renderAccordionView()}</div>
-              </>
-            ) : (
-              <>
-                <div className="flex-shrink-0 flex items-center justify-between gap-3 py-2.5 -mt-1 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-gray-50 border-b border-gray-200/90 z-30">
-                  <div className="min-w-0 flex-1 overflow-x-auto pb-0.5">{renderTabStrip()}</div>
-                  {renderCdToolbarCta()}
-                </div>
-                <div className="flex-1 min-h-0 overflow-y-auto pb-4 pt-3">{renderTabFormCard()}</div>
-              </>
-            )}
-          </>
+          <div className="flex flex-1 min-h-0 flex-col min-h-0 overflow-hidden">
+            <div className="flex-shrink-0 z-20 border-b border-gray-100 bg-white/95 backdrop-blur-sm px-3 py-2 sm:px-4">
+              {renderTabStrip()}
+            </div>
+            <div
+              className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 pb-4 pt-3"
+              role="tabpanel"
+              id="quickadd-emp-panel"
+              aria-labelledby={`quickadd-emp-tab-${activeTab}`}
+            >
+              {renderTabFormCard(true)}
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Sticky bottom: optional CD + Preview */}
-      <div
-        className={`flex-shrink-0 sticky bottom-0 z-40 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-8px_24px_rgba(0,0,0,0.06)] ${showBottomCd ? 'py-3.5' : 'py-2.5'}`}
-      >
-        <div
-          className={`flex items-center ${showBottomCd ? 'flex-col gap-3 sm:flex-row sm:justify-between' : 'justify-end'}`}
-        >
-          {showBottomCd && (
-            <div ref={bottomCdSectionRef} className="flex items-center gap-3 min-w-0 flex-1 w-full sm:w-auto">
-              <div
-                ref={cdPopoverRef}
-                className="relative flex items-center gap-3 rounded-xl border border-emerald-200/90 bg-emerald-50/70 px-3.5 py-2 sm:px-4 sm:py-2.5 min-w-0 flex-1 sm:flex-initial sm:max-w-xl"
-              >
-                {cdBreakdownOpen && (
-                  <div className="absolute bottom-full left-0 z-50 mb-2 w-[min(100vw-3rem,280px)] rounded-lg border border-gray-200 bg-white p-3 shadow-lg">
-                    <CdBreakdownPopoverBody lines={cdBreakdownLines} />
-                  </div>
-                )}
-                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                  <Wallet className="text-emerald-700 w-[18px] h-[18px] sm:w-5 sm:h-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-1 min-w-0">
-                      <span className="text-[10px] font-semibold text-emerald-800 uppercase tracking-wide truncate">CD balance</span>
-                      <button
-                        type="button"
-                        onClick={() => setCdBreakdownOpen((o) => !o)}
-                        className="inline-flex items-center gap-0.5 rounded px-1 py-0.5 text-[10px] font-semibold text-indigo-600 hover:bg-white/80 flex-shrink-0 cursor-pointer"
-                      >
-                        <Info size={12} aria-hidden /> Details
-                      </button>
-                    </div>
-                    {cdAfterSubmit < 0 ? (
-                      <span className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-red-600 flex-shrink-0">
-                        <AlertCircle size={14} aria-hidden /> Insufficient
-                      </span>
-                    ) : (
-                      <span className="flex-shrink-0" title="Sufficient CD for this batch (est.)">
-                        <CheckCircle size={14} className="text-emerald-600" aria-hidden />
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-base sm:text-lg font-bold text-indigo-700 tabular-nums truncate mt-0.5">
-                    {formatInrSigned(cdAfterSubmit)}
-                  </p>
-                  <p className="text-[11px] text-gray-600 tabular-nums leading-snug">
-                    <span className="text-gray-500">Current</span> {formatInr(MOCK_CD_AVAILABLE_RUPEES)}
-                    <span className="text-gray-400"> · </span>
-                    <span className="text-red-600 font-medium">−Est. {formatInr(estimatedCdDraw)}</span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className={`flex items-center justify-end flex-shrink-0 ${showBottomCd ? 'w-full sm:w-auto' : ''}`}>
+      {/* Sticky bottom: bottom CD (when placement is bottom or narrow sidebar mode) + batch summary + Preview */}
+      <div className="flex-shrink-0 sticky bottom-0 z-40 -mx-6 lg:-mx-8 px-6 lg:px-8 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-[0_-4px_16px_rgba(0,0,0,0.05)] py-2.5">
+        {showFooterCdWidget && <div className="mb-3">{renderCdBottomWidget()}</div>}
+        {!cdBalanceVisible && !sidebarTabUnifiedChrome && (
+          <div className="mb-3 flex justify-start">
+            {renderCdBalanceHeaderCta({ isExpanded: false })}
+          </div>
+        )}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4 w-full">
+          <p
+            className="text-[11px] sm:text-xs text-gray-600 leading-snug min-w-0 sm:flex-1 sm:max-w-md"
+            aria-live="polite"
+          >
+            <span className="font-semibold text-gray-800">{batchSummary.count}</span>
+            {' employee'}
+            {batchSummary.count !== 1 ? 's' : ''}
+            <span className="text-gray-300 mx-1.5">·</span>
+            <span className="font-medium text-gray-700">{batchSummary.basicsComplete}</span>
+            {' profile'}
+            {batchSummary.basicsComplete !== 1 ? 's' : ''} complete
+            <span className="text-gray-300 mx-1.5">·</span>
+            <span className="font-medium text-gray-700">{batchSummary.dependentCount}</span>
+            {' dependent'}
+            {batchSummary.dependentCount !== 1 ? 's' : ''}
+          </p>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 min-w-0 sm:flex-shrink-0 sm:ml-auto w-full sm:w-auto">
             <button
               type="button"
               onClick={handlePreview}
-              className="w-full sm:w-auto px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 inline-flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem]"
             >
-              <Eye size={16} /> Preview &amp; Submit
+              <Eye size={18} strokeWidth={2.25} aria-hidden /> Preview &amp; Submit
             </button>
           </div>
         </div>
@@ -1022,10 +1078,17 @@ export default function QuickAdd() {
 function FormField({ label, type = 'text', required, value, onChange, placeholder, error }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label} {required && <span className="text-red-500">*</span>}</label>
-      <input type={type} value={value} onChange={e => onChange(e.target.value)} placeholder={placeholder}
-        className={`w-full px-3 py-2 text-sm border rounded-lg bg-white transition-colors ${error ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`} />
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      <label className={formFieldLabelClass}>
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={`${formControlClass} ${error ? formControlErrorClass : ''}`}
+      />
+      {error && <p className="text-xs text-red-500 mt-1.5 font-medium">{error}</p>}
     </div>
   )
 }
@@ -1033,13 +1096,22 @@ function FormField({ label, type = 'text', required, value, onChange, placeholde
 function SelectField({ label, required, value, onChange, options, placeholder, error }) {
   return (
     <div>
-      <label className="block text-xs font-medium text-gray-600 mb-1.5">{label} {required && <span className="text-red-500">*</span>}</label>
-      <select value={value} onChange={e => onChange(e.target.value)}
-        className={`w-full px-3 py-2 text-sm border rounded-lg bg-white transition-colors ${error ? 'border-red-300 bg-red-50/30' : 'border-gray-200'}`}>
+      <label className={formFieldLabelClass}>
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className={`${formControlClass} ${error ? formControlErrorClass : ''}`}
+      >
         <option value="">{placeholder}</option>
-        {options.map(o => <option key={o} value={o}>{o}</option>)}
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
       </select>
-      {error && <p className="text-xs text-red-500 mt-1">{error}</p>}
+      {error && <p className="text-xs text-red-500 mt-1.5 font-medium">{error}</p>}
     </div>
   )
 }
@@ -1058,16 +1130,3 @@ function SectionPill({ label, done, count }) {
   )
 }
 
-function PF({ label, value }) {
-  return <div><p className="text-xs text-gray-500 mb-0.5">{label}</p><p className="text-sm font-medium text-gray-900">{value || '—'}</p></div>
-}
-
-function getRelationIcon(relation) {
-  const r = (relation || '').toLowerCase()
-  if (r === 'spouse') return <Heart size={14} className="text-pink-500" />
-  if (['father', 'mother'].includes(r)) return <User size={14} className="text-amber-600" />
-  if (['son', 'daughter'].includes(r)) return <User size={14} className="text-blue-500" />
-  if (['brother', 'sister'].includes(r)) return <Users size={14} className="text-violet-500" />
-  if (r.includes('in-law')) return <User size={14} className="text-teal-500" />
-  return <User size={14} className="text-gray-500" />
-}

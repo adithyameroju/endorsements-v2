@@ -1,5 +1,6 @@
 import { Trash2, User, Heart, Users } from 'lucide-react'
 import { dependentRelationGroups, basePlans } from '../data/mockData'
+import { formFieldLabelClass, formControlClass, formHelperTextClass } from '../lib/formUi'
 import PlanSelection from './PlanSelection'
 import { cloneEmployeeGmcPlans, formatInheritedGmcLines, hasActiveSecondaryGmc } from '../lib/planHelpers'
 
@@ -146,7 +147,6 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
       )}
 
       <div>
-        <p className="text-xs font-medium text-gray-600 mb-2">Select relationship to add a dependent</p>
         {!secondaryActive && (
           <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-950 leading-snug">
             <span className="font-semibold">Parents &amp; in-laws:</span>{' '}
@@ -167,45 +167,45 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
             this enrollment. Remove in-law dependents to add Father or Mother.
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
-          {dependentRelationGroups.map(grp => (
-            <div key={grp.label} className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mr-0.5">{grp.label}</span>
-              {grp.relations.map(r => {
-                const disabled = isRelationDisabled(r)
-                return (
-                  <button
-                    key={r}
-                    type="button"
-                    onClick={() => addDependentByRelation(r)}
-                    disabled={disabled}
-                    title={relationDisableTitle(r)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
-                      disabled
-                        ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700 cursor-pointer'
-                    }`}
-                  >
-                    {r}{showAddedCheckmark(r) ? ' ✓' : ''}
-                  </button>
-                )
-              })}
-            </div>
-          ))}
+        <div
+          className="flex flex-wrap gap-2"
+          role="group"
+          aria-label="Add dependent by relationship"
+        >
+          {dependentRelationGroups.flatMap((grp) => grp.relations).map((r) => {
+            const disabled = isRelationDisabled(r)
+            return (
+              <button
+                key={r}
+                type="button"
+                onClick={() => addDependentByRelation(r)}
+                disabled={disabled}
+                title={relationDisableTitle(r)}
+                className={`px-3.5 py-2 text-xs font-semibold rounded-full border transition-all min-h-[2.5rem] ${
+                  disabled
+                    ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-not-allowed'
+                    : 'border-gray-200 bg-white text-gray-800 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-800 cursor-pointer'
+                }`}
+              >
+                {r}
+                {showAddedCheckmark(r) ? ' ✓' : ''}
+              </button>
+            )
+          })}
         </div>
       </div>
 
       {dependents.length === 0 ? (
-        <p className="text-xs text-gray-500 py-1">No dependents yet — choose a relationship above.</p>
+        <p className="text-xs text-gray-500 py-1">No dependents yet — tap a relationship chip above.</p>
       ) : (
         <div className="space-y-4">
           {dependents.map((dep, index) => (
             <div key={dep.id} className="border border-gray-200 rounded-xl p-5 space-y-4 bg-white">
               <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                <h4 className="text-base font-bold text-gray-900 flex items-center gap-2 tracking-tight">
                   {getRelationIcon(dep.relation)}
                   <span>{dep.relation}</span>
-                  <span className="text-xs font-normal text-gray-500">— Dependent {index + 1}</span>
+                  <span className="text-sm font-medium text-gray-500">— Dependent {index + 1}</span>
                 </h4>
                 <button
                   type="button"
@@ -216,43 +216,43 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Full Name</label>
+                  <label className={formFieldLabelClass}>Full Name</label>
                   <input
                     type="text"
                     value={dep.name}
                     onChange={e => updateDependent(index, 'name', e.target.value)}
                     placeholder="Enter name"
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                    className={formControlClass}
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Birth</label>
+                  <label className={formFieldLabelClass}>Date of Birth</label>
                   <input
                     type="date"
                     value={dep.dob}
                     onChange={e => updateDependent(index, 'dob', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                    className={formControlClass}
                   />
                 </div>
                 {dep.relation === 'Spouse' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Marriage</label>
+                    <label className={formFieldLabelClass}>Date of Marriage</label>
                     <input
                       type="date"
                       value={dep.dateOfMarriage || ''}
                       onChange={e => updateDependent(index, 'dateOfMarriage', e.target.value)}
-                      className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                      className={formControlClass}
                     />
                   </div>
                 )}
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender</label>
+                  <label className={formFieldLabelClass}>Gender</label>
                   <select
                     value={dep.gender}
                     onChange={e => updateDependent(index, 'gender', e.target.value)}
-                    className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white"
+                    className={formControlClass}
                   >
                     <option value="">Select</option>
                     <option value="Male">Male</option>
@@ -264,7 +264,7 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
 
               <div className="border-t border-gray-100 pt-4">
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-semibold text-gray-600">GMC Plans</span>
+                  <span className="text-sm font-bold text-gray-900">GMC Plans</span>
                   {hasEmployeeGmc && (
                     <label className="flex items-center gap-2 cursor-pointer">
                       <input
@@ -273,13 +273,13 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
                         onChange={e => setSamePlans(index, e.target.checked)}
                         className="accent-indigo-600 w-4 h-4 rounded"
                       />
-                      <span className="text-xs font-medium text-gray-700">Same as employee</span>
+                      <span className="text-sm font-semibold text-gray-700">Same as employee</span>
                     </label>
                   )}
                 </div>
                 {dep.samePlansAsEmployee !== false && hasEmployeeGmc ? (
                   <div className="px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-1.5">
-                    <p className="text-xs text-gray-500 mb-1">Inherited from employee (GMC — view only)</p>
+                    <p className={formHelperTextClass}>Inherited from employee (GMC — view only)</p>
                     <ul className="text-sm font-medium text-gray-900 list-disc list-inside space-y-0.5">
                       {formatInheritedGmcLines(employeePlans).map((line, i) => (
                         <li key={i}>{line}</li>
@@ -294,6 +294,7 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
                     gmcOnly
                     hideInsuranceHeader
                     hideGmcToggle
+                    horizontalGmcLayout
                   />
                 )}
               </div>

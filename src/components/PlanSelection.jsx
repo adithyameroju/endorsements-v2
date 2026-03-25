@@ -1,7 +1,17 @@
 import { Plus, X, Heart, Shield } from 'lucide-react'
 import { basePlans, secondaryPlans, addonPlans, topupPlans, gpaBasePlans } from '../data/mockData'
+import { formFieldLabelClass, formControlClass } from '../lib/formUi'
 
-export default function PlanSelection({ plans, onChange, label = '', gmcOnly = false, hideInsuranceHeader = false, hideGmcToggle = false }) {
+export default function PlanSelection({
+  plans,
+  onChange,
+  label = '',
+  gmcOnly = false,
+  hideInsuranceHeader = false,
+  hideGmcToggle = false,
+  /** Dependent GMC: single row of controls to save vertical space */
+  horizontalGmcLayout = false,
+}) {
   const updatePlans = (key, value) => {
     onChange({ ...plans, [key]: value })
   }
@@ -47,8 +57,8 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
       {/* Header — omitted for dependents when custom GMC is selected */}
       {!hideInsuranceHeader && (
         <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-          <h3 className="text-sm font-semibold text-gray-900">Insurance Plans <span className="text-red-500">*</span></h3>
-          <p className="text-xs text-gray-500">Toggle on the plans you want to enroll this employee in</p>
+          <h3 className="text-base font-bold text-gray-900 tracking-tight">Insurance Plans <span className="text-red-500">*</span></h3>
+          <p className="text-xs text-gray-500 leading-snug">Toggle on the plans you want to enroll this employee in</p>
         </div>
       )}
 
@@ -62,8 +72,8 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
                 <Heart size={16} className="text-blue-600" />
               </div>
               <div>
-                <span className="text-sm font-semibold text-gray-900">GMC</span>
-                <p className="text-xs text-gray-500">Group Medical Coverage — configure plan for this dependent</p>
+                <span className="text-base font-bold text-gray-900">GMC</span>
+                <p className="text-xs text-gray-500 leading-snug">Group Medical Coverage — configure plan for this dependent</p>
               </div>
             </div>
           ) : (
@@ -73,8 +83,8 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
                   <Heart size={16} className="text-blue-600" />
                 </div>
                 <div>
-                  <span className="text-sm font-semibold text-gray-900">GMC</span>
-                  <p className="text-xs text-gray-500">Comprehensive medical insurance for hospitalization, OPD & more</p>
+                  <span className="text-base font-bold text-gray-900">GMC</span>
+                  <p className="text-xs text-gray-500 leading-snug">Comprehensive medical insurance for hospitalization, OPD & more</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -91,81 +101,185 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
 
           {/* GMC Options */}
           {showGmcConfigure && (
-            <div className="border-t border-gray-100 p-4 bg-blue-50/20 space-y-3">
-              <div className="mb-3">
-                <p className="text-xs font-semibold text-blue-700 mb-2">CONFIGURE GMC PLANS</p>
-              </div>
-              
-              {/* Base plan - mandatory dropdown */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Base Plan <span className="text-red-500">*</span></label>
-                <select
-                  value={plans.gmcBasePlan || ''}
-                  onChange={e => updatePlans('gmcBasePlan', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
-                >
-                  <option value="">Select base plan</option>
-                  {basePlans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmt(p.sumInsured)}</option>)}
-                </select>
-              </div>
-
-              {/* Optional add-ons - toggle to add */}
-              <div className="space-y-2">
-                <OptionalPlan
-                  label="Top-up Plan"
-                  active={plans.gmcTopup && plans.gmcTopup !== 'none'}
-                  onToggle={(on) => updatePlans('gmcTopup', on ? topupPlans[0].id : 'none')}
-                >
-                  <select
-                    value={plans.gmcTopup || ''}
-                    onChange={e => updatePlans('gmcTopup', e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white"
-                  >
-                    {topupPlans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmt(p.sumInsured)}</option>)}
-                  </select>
-                </OptionalPlan>
-
-                <OptionalPlan
-                  label="Add-on Plan"
-                  active={(plans.gmcAddons || []).length > 0}
-                  onToggle={(on) => updatePlans('gmcAddons', on ? [addonPlans[0].id] : [])}
-                >
-                  <div className="flex flex-wrap gap-1.5">
-                    {addonPlans.map(p => {
-                      const sel = (plans.gmcAddons || []).includes(p.id)
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            const cur = plans.gmcAddons || []
-                            updatePlans('gmcAddons', sel ? cur.filter(a => a !== p.id) : [...cur, p.id])
-                          }}
-                          className={`px-2.5 py-1 text-xs rounded-full border cursor-pointer transition-all ${
-                            sel ? 'bg-indigo-50 border-indigo-300 text-indigo-700 font-medium' : 'bg-white border-gray-200 text-gray-600 hover:border-gray-300'
-                          }`}
-                        >
-                          {sel ? '✓ ' : ''}{p.name}
-                        </button>
-                      )
-                    })}
+            <div
+              className={`border-t border-gray-100 ${horizontalGmcLayout ? 'p-3 bg-slate-50/70' : 'p-4 bg-blue-50/20 space-y-3'}`}
+            >
+              {horizontalGmcLayout ? (
+                <div className="grid grid-cols-1 min-[480px]:grid-cols-2 xl:grid-cols-4 gap-3 w-full">
+                  <div className="min-w-0 w-full">
+                    <label className={`${formFieldLabelClass} mb-1.5`}>Base <span className="text-red-500">*</span></label>
+                    <select
+                      value={plans.gmcBasePlan || ''}
+                      onChange={(e) => updatePlans('gmcBasePlan', e.target.value)}
+                      className={formControlClass}
+                    >
+                      <option value="">Select</option>
+                      {basePlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name.replace(/^Base Plan - /, '')}
+                        </option>
+                      ))}
+                    </select>
                   </div>
-                </OptionalPlan>
+                  <div className="min-w-0 w-full">
+                    <OptionalPlanInline
+                      label="Secondary"
+                      active={plans.gmcSecondaryPlan && plans.gmcSecondaryPlan !== 'none'}
+                      onToggle={(on) => updatePlans('gmcSecondaryPlan', on ? secondaryPlans[0].id : 'none')}
+                    >
+                      <select
+                        value={plans.gmcSecondaryPlan || ''}
+                        onChange={(e) => updatePlans('gmcSecondaryPlan', e.target.value)}
+                        className={formControlClass}
+                      >
+                        {secondaryPlans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name.replace(/^Secondary Plan - /, '')}
+                          </option>
+                        ))}
+                      </select>
+                    </OptionalPlanInline>
+                  </div>
+                  <div className="min-w-0 w-full">
+                    <OptionalPlanInline
+                      label="Top-up"
+                      active={plans.gmcTopup && plans.gmcTopup !== 'none'}
+                      onToggle={(on) => updatePlans('gmcTopup', on ? topupPlans[0].id : 'none')}
+                    >
+                      <select
+                        value={plans.gmcTopup || ''}
+                        onChange={(e) => updatePlans('gmcTopup', e.target.value)}
+                        className={formControlClass}
+                      >
+                        {topupPlans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name.replace(/^Top-Up - /, '')}
+                          </option>
+                        ))}
+                      </select>
+                    </OptionalPlanInline>
+                  </div>
+                  <div className="min-w-0 w-full xl:col-span-1">
+                    <OptionalPlanInline
+                      label="Add-ons"
+                      active={(plans.gmcAddons || []).length > 0}
+                      onToggle={(on) => updatePlans('gmcAddons', on ? [addonPlans[0].id] : [])}
+                    >
+                      <div className="flex flex-wrap gap-1 w-full">
+                        {addonPlans.map((p) => {
+                          const sel = (plans.gmcAddons || []).includes(p.id)
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                const cur = plans.gmcAddons || []
+                                updatePlans('gmcAddons', sel ? cur.filter((a) => a !== p.id) : [...cur, p.id])
+                              }}
+                              className={`px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium ${
+                                sel
+                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                              }`}
+                            >
+                              {sel ? '✓ ' : ''}
+                              {p.name.split(' ')[0]}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </OptionalPlanInline>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <label className={formFieldLabelClass}>
+                      Base Plan <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={plans.gmcBasePlan || ''}
+                      onChange={(e) => updatePlans('gmcBasePlan', e.target.value)}
+                      className={formControlClass}
+                    >
+                      <option value="">Select base plan</option>
+                      {basePlans.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} — {fmt(p.sumInsured)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
 
-                <OptionalPlan
-                  label="Secondary Plan"
-                  active={plans.gmcSecondaryPlan && plans.gmcSecondaryPlan !== 'none'}
-                  onToggle={(on) => updatePlans('gmcSecondaryPlan', on ? secondaryPlans[0].id : 'none')}
-                >
-                  <select
-                    value={plans.gmcSecondaryPlan || ''}
-                    onChange={e => updatePlans('gmcSecondaryPlan', e.target.value)}
-                    className="w-full px-2.5 py-1.5 text-sm border border-gray-200 rounded-lg bg-white"
-                  >
-                    {secondaryPlans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmt(p.sumInsured)}</option>)}
-                  </select>
-                </OptionalPlan>
-              </div>
+                  <div className="space-y-2">
+                    <OptionalPlan
+                      label="Top-up Plan"
+                      active={plans.gmcTopup && plans.gmcTopup !== 'none'}
+                      onToggle={(on) => updatePlans('gmcTopup', on ? topupPlans[0].id : 'none')}
+                    >
+                      <select
+                        value={plans.gmcTopup || ''}
+                        onChange={(e) => updatePlans('gmcTopup', e.target.value)}
+                        className={formControlClass}
+                      >
+                        {topupPlans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {fmt(p.sumInsured)}
+                          </option>
+                        ))}
+                      </select>
+                    </OptionalPlan>
+
+                    <OptionalPlan
+                      label="Add-on Plan"
+                      active={(plans.gmcAddons || []).length > 0}
+                      onToggle={(on) => updatePlans('gmcAddons', on ? [addonPlans[0].id] : [])}
+                    >
+                      <div className="flex flex-wrap gap-1.5">
+                        {addonPlans.map((p) => {
+                          const sel = (plans.gmcAddons || []).includes(p.id)
+                          return (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                const cur = plans.gmcAddons || []
+                                updatePlans('gmcAddons', sel ? cur.filter((a) => a !== p.id) : [...cur, p.id])
+                              }}
+                              className={`px-3 py-1.5 text-xs rounded-full border cursor-pointer transition-all font-medium ${
+                                sel
+                                  ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
+                                  : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+                              }`}
+                            >
+                              {sel ? '✓ ' : ''}
+                              {p.name}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </OptionalPlan>
+
+                    <OptionalPlan
+                      label="Secondary Plan"
+                      active={plans.gmcSecondaryPlan && plans.gmcSecondaryPlan !== 'none'}
+                      onToggle={(on) => updatePlans('gmcSecondaryPlan', on ? secondaryPlans[0].id : 'none')}
+                    >
+                      <select
+                        value={plans.gmcSecondaryPlan || ''}
+                        onChange={(e) => updatePlans('gmcSecondaryPlan', e.target.value)}
+                        className={formControlClass}
+                      >
+                        {secondaryPlans.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name} — {fmt(p.sumInsured)}
+                          </option>
+                        ))}
+                      </select>
+                    </OptionalPlan>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -180,8 +294,8 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
                 <Shield size={16} className="text-red-600" />
               </div>
               <div>
-                <span className="text-sm font-semibold text-gray-900">GPA</span>
-                <p className="text-xs text-gray-500">Accidental death and disability coverage</p>
+                <span className="text-base font-bold text-gray-900">GPA</span>
+                <p className="text-xs text-gray-500 leading-snug">Accidental death and disability coverage</p>
               </div>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
@@ -198,16 +312,14 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
           {/* GPA Options */}
           {gpaEnabled && (
             <div className="border-t border-gray-100 p-4 bg-red-50/20 space-y-3">
-              <div className="mb-3">
-                <p className="text-xs font-semibold text-red-700 mb-2">CONFIGURE GPA PLAN</p>
-              </div>
-              
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Base Plan <span className="text-red-500">*</span></label>
+                <label className={formFieldLabelClass}>
+                  Base Plan <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={plans.gpaBasePlan || ''}
                   onChange={e => updatePlans('gpaBasePlan', e.target.value)}
-                  className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white"
+                  className={formControlClass}
                 >
                   <option value="">Select base plan</option>
                   {gpaBasePlans.map(p => <option key={p.id} value={p.id}>{p.name} — {fmt(p.sumInsured)}</option>)}
@@ -216,7 +328,7 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
 
               {plans.gpaBasePlan && (
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Sum Insured Method <span className="text-red-500">*</span></label>
+                  <label className={formFieldLabelClass}>Sum Insured Method <span className="text-red-500">*</span></label>
                   <div className="space-y-1.5">
                     <label className={`flex items-center gap-2.5 p-2.5 rounded-lg border cursor-pointer transition-all ${
                       plans.gpaSiType === 'fixed' ? 'border-red-300 bg-red-50' : 'border-gray-200 bg-white hover:border-gray-300'
@@ -245,7 +357,7 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
                             value={plans.gpaCtc || ''}
                             onChange={e => updatePlans('gpaCtc', e.target.value)}
                             onClick={e => e.stopPropagation()}
-                            className="w-32 px-2.5 py-1 text-sm border border-red-200 rounded-md bg-white"
+                            className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-red-200 rounded-lg bg-white box-border"
                           />
                         )}
                       </div>
@@ -265,7 +377,7 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
                               value={plans.gpaManualSi || ''}
                               onChange={e => updatePlans('gpaManualSi', e.target.value)}
                               onClick={e => e.stopPropagation()}
-                              className="w-32 px-2.5 py-1 text-sm border border-red-200 rounded-md bg-white"
+                              className="w-full max-w-[10rem] min-h-[2.75rem] px-3 py-2.5 text-sm border border-red-200 rounded-lg bg-white box-border"
                             />
                             <span className="text-xs text-gray-400">₹1L – ₹50L</span>
                           </div>
@@ -284,11 +396,44 @@ export default function PlanSelection({ plans, onChange, label = '', gmcOnly = f
   )
 }
 
+/** Full-width optional block for horizontal dependent GMC row */
+function OptionalPlanInline({ label, active, onToggle, children }) {
+  if (!active) {
+    return (
+      <div className="min-w-0 w-full flex flex-col gap-1">
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <button
+          type="button"
+          onClick={() => onToggle(true)}
+          className="w-full min-h-[2.75rem] px-3 rounded-lg border border-dashed border-gray-300 bg-white text-sm font-semibold text-gray-600 hover:border-indigo-300 hover:bg-indigo-50/40 hover:text-indigo-800 transition-colors cursor-pointer"
+        >
+          + Add {label}
+        </button>
+      </div>
+    )
+  }
+  return (
+    <div className="min-w-0 w-full flex flex-col gap-1.5">
+      <div className="flex items-center justify-between gap-2 w-full">
+        <span className="text-sm font-semibold text-gray-700">{label}</span>
+        <button
+          type="button"
+          onClick={() => onToggle(false)}
+          className="text-xs font-semibold text-red-600 hover:underline cursor-pointer shrink-0"
+        >
+          Remove
+        </button>
+      </div>
+      <div className="w-full min-w-0">{children}</div>
+    </div>
+  )
+}
+
 function OptionalPlan({ label, active, onToggle, children }) {
   return (
     <div className={`rounded-lg border transition-all ${active ? 'border-indigo-200 bg-indigo-50/30' : 'border-gray-200 bg-gray-50/50'}`}>
       <div className="flex items-center justify-between px-3 py-2">
-        <span className="text-xs font-medium text-gray-700">{label}</span>
+        <span className="text-sm font-semibold text-gray-800">{label}</span>
         {active ? (
           <button type="button" onClick={() => onToggle(false)} className="text-xs text-gray-400 hover:text-red-500 cursor-pointer flex items-center gap-0.5">
             <X size={12} /> Remove

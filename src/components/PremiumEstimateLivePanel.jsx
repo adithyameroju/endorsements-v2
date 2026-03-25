@@ -1,5 +1,6 @@
-import { Calculator, Wallet, TrendingDown, CheckCircle, AlertCircle, PanelRightClose } from 'lucide-react'
+import { Calculator, Wallet, TrendingDown, CheckCircle, AlertCircle, PanelRightClose, Info } from 'lucide-react'
 import { formatInr, formatInrSigned } from '../lib/currencyFormat'
+import AnimatedCdAmount from './AnimatedCdAmount'
 
 function lineDisplayLabel(line) {
   switch (line.id) {
@@ -64,13 +65,32 @@ export default function PremiumEstimateLivePanel({
         </div>
       </div>
 
+      <div className="px-3 pt-2 pb-0">
+        <div className="rounded-lg border border-violet-200/80 bg-gradient-to-br from-violet-50/95 to-indigo-50/40 px-2.5 py-2 shadow-sm">
+          <div className="flex gap-2">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/80 border border-violet-100">
+              <Info size={14} className="text-violet-600" aria-hidden />
+            </div>
+            <div className="min-w-0 text-[10px] leading-snug text-violet-950">
+              <p className="font-semibold text-violet-900 mb-0.5">Your CD after this batch</p>
+              <p className="text-violet-800/90">
+                We estimate how much premium this endorsement may draw from your Corporate Deposit (CD). Lines below
+                reflect employees, dependents, and optional GMC cover you selected — totals update as you edit.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="px-3 py-2.5 flex-1 overflow-y-auto min-h-0">
         {detailLines.length > 0 ? (
           <ul className="space-y-1.5 mb-2.5">
             {detailLines.map((l) => (
               <li key={l.id} className="flex justify-between gap-2 text-[11px] text-gray-600">
                 <span className="leading-snug">{lineDisplayLabel(l)}</span>
-                <span className="tabular-nums font-medium text-gray-900 flex-shrink-0">{formatInr(l.amount)}</span>
+                <AnimatedCdAmount value={l.amount} className="font-medium text-gray-900 flex-shrink-0">
+                  {formatInr(l.amount)}
+                </AnimatedCdAmount>
               </li>
             ))}
           </ul>
@@ -80,32 +100,39 @@ export default function PremiumEstimateLivePanel({
 
         <div className="border-t border-gray-200 pt-2.5 flex items-end justify-between gap-2">
           <span className="text-[11px] font-bold text-gray-900">Total (Pro-rata)</span>
-          <span className="text-base font-bold text-violet-700 tabular-nums">{formatInr(totalPremium)}</span>
+          <AnimatedCdAmount value={totalPremium} className="text-sm font-bold text-violet-700">
+            {formatInr(totalPremium)}
+          </AnimatedCdAmount>
         </div>
 
-        <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50/90 p-2.5 space-y-1.5">
+        <div className="mt-3 rounded-lg border border-gray-200 bg-gradient-to-b from-gray-50 to-slate-50/80 p-2.5 space-y-1.5 shadow-inner">
           <div className="flex items-center justify-between gap-2 text-[11px]">
             <span className="flex items-center gap-1 text-gray-600">
               <Wallet size={12} className="text-gray-500 flex-shrink-0" />
               Current CD
             </span>
-            <span className="tabular-nums font-semibold text-gray-900">{formatInr(currentCd)}</span>
+            <AnimatedCdAmount value={currentCd} className="font-semibold text-gray-900">
+              {formatInr(currentCd)}
+            </AnimatedCdAmount>
           </div>
           <div className="flex items-center justify-between gap-2 text-[11px]">
             <span className="flex items-center gap-1 text-red-600 font-medium">
               <TrendingDown size={12} className="flex-shrink-0" />
               Deduction
             </span>
-            <span className="tabular-nums font-semibold text-red-600">−{formatInr(totalPremium)}</span>
+            <AnimatedCdAmount value={totalPremium} className="font-semibold text-red-600">
+              −{formatInr(totalPremium)}
+            </AnimatedCdAmount>
           </div>
           <hr className="border-gray-200" />
           <div className="flex items-center justify-between gap-2">
             <span className="text-[11px] font-bold text-gray-900">After</span>
-            <span
-              className={`text-xs font-bold tabular-nums ${balanceAfter < 0 ? 'text-red-600' : 'text-gray-900'}`}
+            <AnimatedCdAmount
+              value={balanceAfter}
+              className={`text-xs font-bold ${balanceAfter < 0 ? 'text-red-600' : 'text-gray-900'}`}
             >
               {formatInrSigned(balanceAfter)}
-            </span>
+            </AnimatedCdAmount>
           </div>
         </div>
       </div>
