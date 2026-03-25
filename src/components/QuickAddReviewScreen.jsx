@@ -158,6 +158,7 @@ export default function QuickAddReviewScreen({
               lines={cdBreakdownLines}
               policyDaysRemaining={policyDaysRemaining}
               primaryBatchCount={employees.length}
+              estimateReady
             />
           </div>
         </aside>

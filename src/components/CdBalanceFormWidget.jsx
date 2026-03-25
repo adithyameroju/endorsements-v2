@@ -113,6 +113,7 @@ export function CdBreakdownPopoverBody({ lines, primaryBatchCount = 0 }) {
 /**
  * Premium line breakdown + CD wallet math + status.
  * `variant="card"` — sidebar / review rail. `variant="embedded"` — inside bottom sticky emerald shell.
+ * `estimateReady` — when false, hides pro-rata breakdown and batch CD impact until user runs Calculate premium.
  */
 export default function CdBalanceFormWidget({
   cdAfterSubmit,
@@ -121,12 +122,17 @@ export default function CdBalanceFormWidget({
   lines,
   policyDaysRemaining,
   primaryBatchCount = 0,
+  estimateReady = true,
   variant = 'card',
   className = '',
 }) {
-  const prevSig = useRef(`${estimatedCdDraw}|${cdAfterSubmit}`)
+  const prevSig = useRef(null)
   const [panelFlash, setPanelFlash] = useState(false)
   useEffect(() => {
+    if (!estimateReady) {
+      prevSig.current = null
+      return
+    }
     const sig = `${estimatedCdDraw}|${cdAfterSubmit}`
     if (prevSig.current === sig) return
     prevSig.current = sig
@@ -139,40 +145,79 @@ export default function CdBalanceFormWidget({
       clearTimeout(onTimer)
       clearTimeout(offTimer)
     }
-  }, [estimatedCdDraw, cdAfterSubmit])
+  }, [estimateReady, estimatedCdDraw, cdAfterSubmit])
 
   const totalLine = lines.find((l) => l.id === 'total')
   const totalPremium = totalLine?.amount ?? estimatedCdDraw
   const isSufficient = cdAfterSubmit >= 0
 
-  const inner = (
-    <>
-      {/* Header */}
-      <div className={variant === 'card' ? '' : 'pb-1 border-b border-emerald-200/50 mb-1'}>
-        <div className="flex items-start justify-between gap-2">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <span
-              className={`${formSectionBadgeClass} shrink-0 ${
-                variant === 'card' ? 'bg-violet-100 text-violet-700' : 'bg-white/90 text-violet-700 border border-violet-100'
-              }`}
-            >
-              <Calculator size={14} aria-hidden />
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-sm font-bold text-gray-900 tracking-tight leading-snug">
-                Premium &amp; CD impact (est.)
-              </h3>
-              {policyDaysRemaining != null && (
-                <p className="text-[10px] text-gray-500 mt-0.5">
-                  {policyDaysRemaining} day{policyDaysRemaining === 1 ? '' : 's'} remaining in policy
-                </p>
-              )}
-            </div>
+  const headerBlock = (
+    <div className={variant === 'card' ? '' : 'pb-1 border-b border-emerald-200/50 mb-1'}>
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <span
+            className={`${formSectionBadgeClass} shrink-0 ${
+              variant === 'card' ? 'bg-violet-100 text-violet-700' : 'bg-white/90 text-violet-700 border border-violet-100'
+            }`}
+          >
+            <Calculator size={14} aria-hidden />
+          </span>
+          <div className="min-w-0">
+            <h3 className="text-sm font-bold text-gray-900 tracking-tight leading-snug">
+              Premium &amp; CD impact (est.)
+            </h3>
+            {policyDaysRemaining != null && (
+              <p className="text-[10px] text-gray-500 mt-0.5">
+                {policyDaysRemaining} day{policyDaysRemaining === 1 ? '' : 's'} remaining in policy
+              </p>
+            )}
           </div>
         </div>
-        <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">Pro-rata estimate — updates as you edit.</p>
       </div>
+      <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
+        {estimateReady
+          ? 'Pro-rata estimate after calculate — use Recalculate if you change the batch.'
+          : 'Calculate premium below to load pro-rata lines and CD impact for this batch.'}
+      </p>
+    </div>
+  )
 
+  const innerPending = (
+    <>
+      {headerBlock}
+      <div className="rounded-lg border border-gray-200 bg-gradient-to-b from-gray-50 to-slate-50/90 p-3 shadow-inner">
+        <div className="flex items-center justify-between gap-2 text-[11px] pb-3 border-b border-gray-200/80">
+          <span className="flex items-center gap-1.5 text-gray-600 min-w-0">
+            <Wallet size={13} className="text-gray-500 shrink-0" aria-hidden />
+            Current CD balance
+          </span>
+          <span className="font-semibold text-gray-900 tabular-nums shrink-0">{formatInr(currentCd)}</span>
+        </div>
+        <div
+          className={`mt-3 rounded-lg border border-dashed px-3 py-4 text-center ${
+            variant === 'embedded'
+              ? 'border-emerald-200/80 bg-emerald-50/50'
+              : 'border-violet-200/80 bg-violet-50/40'
+          }`}
+        >
+          <Calculator
+            size={22}
+            className={`mx-auto mb-2 ${variant === 'embedded' ? 'text-emerald-600/80' : 'text-violet-500'}`}
+            aria-hidden
+          />
+          <p className="text-[11px] font-semibold text-gray-900">Estimate not loaded yet</p>
+          <p className="text-[10px] text-gray-600 mt-1 leading-snug">
+            Click <span className="font-semibold text-gray-800">Calculate premium</span> in the footer, then you can open{' '}
+            <span className="font-semibold text-gray-800">Preview &amp; Submit</span>.
+          </p>
+        </div>
+      </div>
+    </>
+  )
+
+  const innerReady = (
+    <>
+      {headerBlock}
       {/* Section A — Premium breakdown */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
@@ -244,6 +289,8 @@ export default function CdBalanceFormWidget({
       </div>
     </>
   )
+
+  const inner = estimateReady ? innerReady : innerPending
 
   if (variant === 'embedded') {
     return (

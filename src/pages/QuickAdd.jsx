@@ -161,6 +161,10 @@ export default function QuickAdd() {
   const [hasDraftOnDisk, setHasDraftOnDisk] = useState(() => hasQuickAddDraft())
   /** fresh → Calculate | calculated → Preview | stale → Recalculate after edits */
   const [premiumFlow, setPremiumFlow] = useState('fresh')
+  /** Section keys `${empId}-basic|plans|dependents` — brief shake after failed Calculate premium */
+  const [shakeSectionKeys, setShakeSectionKeys] = useState([])
+  /** Top error strip — pulse/shake after failed Calculate (scroll targets this id first) */
+  const [errorBannerEmphasis, setErrorBannerEmphasis] = useState(false)
   const isFirstEmployeesEffect = useRef(true)
   const suppressPremiumStaleOnce = useRef(false)
 
@@ -233,6 +237,9 @@ export default function QuickAdd() {
     },
     [],
   )
+
+  /** CD widget shows pro-rata breakdown + impact only after Calculate premium. */
+  const cdEstimateReady = premiumFlow === 'calculated'
 
   /** Sidebar rail on large screens (accordion + tab each keep their own layout below). */
   const showFormSidebarCd = cdPlacement === 'sidebar' && isLgViewport
@@ -337,7 +344,17 @@ export default function QuickAdd() {
   }
 
   const handleCalculatePremium = () => {
-    setPremiumFlow('calculated')
+    const invalid = employees.filter(employeeHasAnyValidationIssue)
+    if (invalid.length === 0) {
+      setPremiumFlow('calculated')
+      return
+    }
+    const first = invalid[0]
+    const idx = employees.findIndex((e) => e.id === first.id)
+    if (idx !== -1) setActiveTab(idx)
+    setExpandedId(first.id)
+    invalid.forEach((emp) => touchAllFieldsForEmployee(emp.id))
+    runValidationFailureNudge(first)
   }
 
   const scrollToFirstErrorSectionForEmployee = (emp) => {
@@ -357,6 +374,33 @@ export default function QuickAdd() {
     }
   }
 
+  const scrollErrorBannerIntoView = () => {
+    document.getElementById('quickadd-error-banner')?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'center',
+    })
+  }
+
+  /** Shake error strip + invalid sections, then scroll banner then first error block */
+  const runValidationFailureNudge = (firstInvalidEmp) => {
+    const keys = []
+    employees.forEach((emp) => {
+      if (!employeeHasAnyValidationIssue(emp)) return
+      const f = sectionErrorFlags(emp)
+      if (f.basic) keys.push(`${emp.id}-basic`)
+      if (f.plans) keys.push(`${emp.id}-plans`)
+      if (f.dependents) keys.push(`${emp.id}-dependents`)
+    })
+    setShakeSectionKeys(keys)
+    setErrorBannerEmphasis(true)
+    window.setTimeout(() => setShakeSectionKeys([]), 700)
+    window.setTimeout(() => setErrorBannerEmphasis(false), 700)
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(scrollErrorBannerIntoView)
+    })
+    window.setTimeout(() => scrollToFirstErrorSectionForEmployee(firstInvalidEmp), 480)
+  }
+
   const handlePreview = () => {
     if (premiumFlow !== 'calculated') return
     let hasErrors = false
@@ -366,8 +410,8 @@ export default function QuickAdd() {
         setExpandedId(emp.id)
         const idx = employees.findIndex((e) => e.id === emp.id)
         if (idx !== -1) setActiveTab(idx)
-        touchAllFieldsForEmployee(emp.id)
-        window.setTimeout(() => scrollToFirstErrorSectionForEmployee(emp), 150)
+        employees.filter(employeeHasAnyValidationIssue).forEach((e) => touchAllFieldsForEmployee(e.id))
+        runValidationFailureNudge(emp)
         break
       }
     }
@@ -505,9 +549,18 @@ export default function QuickAdd() {
         const depsCount = emp.dependents.length
         const completed = fieldCount(emp)
         const hasValidationErrors = employeeHasAnyValidationIssue(emp)
+        const cardShake =
+          !isOpen &&
+          hasValidationErrors &&
+          shakeSectionKeys.some((k) => k.startsWith(`${emp.id}-`))
+            ? ' quickadd-section-shake'
+            : ''
 
         return (
-          <div key={emp.id} className={`bg-white border rounded-xl overflow-hidden transition-all ${isOpen ? 'border-indigo-300 shadow-md ring-1 ring-indigo-100' : basicDone ? 'border-emerald-200' : hasValidationErrors ? 'border-red-200 ring-1 ring-red-100/50' : 'border-gray-200 hover:border-gray-300'}`}>
+          <div
+            key={emp.id}
+            className={`bg-white border rounded-xl overflow-hidden transition-all ${isOpen ? 'border-indigo-300 shadow-md ring-1 ring-indigo-100' : basicDone ? 'border-emerald-200' : hasValidationErrors ? 'border-red-200 ring-1 ring-red-100/50' : 'border-gray-200 hover:border-gray-300'}${cardShake}`}
+          >
             {/* Accordion header */}
             <button
               onClick={() => toggleAccordion(emp.id)}
@@ -713,13 +766,14 @@ export default function QuickAdd() {
     const showError = (field) => touched[field] && errors[field]
     const sec = sectionErrorFlags(emp)
     const ringErr = (on) => (on ? 'ring-2 ring-red-200/90 border-red-200/90' : 'border-gray-200/90')
+    const shk = (suffix) => (shakeSectionKeys.includes(`${emp.id}-${suffix}`) ? ' quickadd-section-shake' : '')
 
     return (
       <>
         <section
           id={`quickadd-${emp.id}-section-basic`}
           data-section-has-error={sec.basic ? 'true' : 'false'}
-          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500 ${ringErr(sec.basic)}`}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500 ${ringErr(sec.basic)}${shk('basic')}`}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
@@ -750,7 +804,7 @@ export default function QuickAdd() {
         <section
           id={`quickadd-${emp.id}-section-plans`}
           data-section-has-error={sec.plans ? 'true' : 'false'}
-          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500 ${ringErr(sec.plans)}`}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500 ${ringErr(sec.plans)}${shk('plans')}`}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
@@ -773,7 +827,7 @@ export default function QuickAdd() {
         <section
           id={`quickadd-${emp.id}-section-dependents`}
           data-section-has-error={sec.dependents ? 'true' : 'false'}
-          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500 ${ringErr(sec.dependents)}`}
+          className={`rounded-xl border bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500 ${ringErr(sec.dependents)}${shk('dependents')}`}
         >
           <div className="flex items-center justify-between mb-4">
             <h3 className={`${formSectionTitleClass} flex items-center gap-2.5`}>
@@ -813,19 +867,33 @@ export default function QuickAdd() {
         onClick={() => persistCdBalanceVisible(!isExpanded)}
         className="inline-flex min-w-0 max-w-full items-center gap-2 rounded-lg border border-emerald-200/90 bg-emerald-50/90 px-2.5 py-2 text-left transition-colors hover:bg-emerald-100/90 cursor-pointer sm:px-3"
         aria-label={
-          isExpanded ? 'Close CD balance view' : 'View CD balance — after batch estimate'
+          isExpanded
+            ? 'Close CD balance view'
+            : cdEstimateReady
+              ? 'View CD balance after estimate'
+              : 'View CD panel — calculate premium first for projected balance'
         }
-        title={isExpanded ? 'Close CD balance view' : 'View CD balance'}
+        title={
+          isExpanded
+            ? 'Close CD balance view'
+            : cdEstimateReady
+              ? 'View CD balance'
+              : 'Calculate premium to see projected balance after this batch'
+        }
       >
         <Wallet size={17} className="shrink-0 text-emerald-700" aria-hidden />
         <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
           <span className="shrink-0 text-xs font-bold text-emerald-900">CD balance:</span>
-          <AnimatedCdAmount
-            value={cdAfterSubmit}
-            className="min-w-0 truncate text-sm font-bold text-indigo-700 tabular-nums"
-          >
-            {formatInrSigned(cdAfterSubmit)}
-          </AnimatedCdAmount>
+          {cdEstimateReady ? (
+            <AnimatedCdAmount
+              value={cdAfterSubmit}
+              className="min-w-0 truncate text-sm font-bold text-indigo-700 tabular-nums"
+            >
+              {formatInrSigned(cdAfterSubmit)}
+            </AnimatedCdAmount>
+          ) : (
+            <span className="min-w-0 truncate text-sm font-semibold text-gray-500 tabular-nums">—</span>
+          )}
         </span>
         {isExpanded ? (
           <EyeOff size={17} className="shrink-0 text-emerald-700" aria-hidden />
@@ -849,6 +917,7 @@ export default function QuickAdd() {
       lines={cdBreakdownLines}
       policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
       primaryBatchCount={employees.length}
+      estimateReady={cdEstimateReady}
     />
   )
 
@@ -880,6 +949,7 @@ export default function QuickAdd() {
           lines={cdBreakdownLines}
           policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
           primaryBatchCount={employees.length}
+          estimateReady={cdEstimateReady}
         />
       </div>
     </div>
@@ -1013,7 +1083,8 @@ export default function QuickAdd() {
 
       {errorBannerSummary.affectedCount > 0 && (
         <div
-          className="mb-3 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950"
+          id="quickadd-error-banner"
+          className={`mb-3 flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2 text-xs text-amber-950 transition-shadow ${errorBannerEmphasis ? 'quickadd-error-banner-emphasis' : ''}`}
           role="alert"
           aria-live="polite"
           title={errorBannerSummary.line}
