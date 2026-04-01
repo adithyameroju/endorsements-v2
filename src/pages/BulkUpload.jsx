@@ -69,8 +69,10 @@ export default function BulkUpload() {
         title="Bulk Upload"
         subtitle="Upload an Excel template to add multiple employees at once"
         breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Bulk Upload' }]}
+        trailing={
+          <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} compact />
+        }
       />
-      <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} />
 
       <div className="space-y-5">
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">

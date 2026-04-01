@@ -1,53 +1,53 @@
-import { CheckCircle, Pencil, Trash2 } from 'lucide-react'
+import { useMemo } from 'react'
+import { CheckCircle, Pencil } from 'lucide-react'
 import PageHeader from './PageHeader'
 import Stepper from './Stepper'
 import CdBalanceFormWidget from './CdBalanceFormWidget'
 import QuickAddBatchStickyFooter from './QuickAddBatchStickyFooter'
 import ReviewEmployeesPanel from './ReviewEmployeesPanel'
+import { computeUpdateFlowCdState } from '../lib/updateFlowPremium'
 
 /**
- * Quick Add — step 2 “Preview & Submit” (in-app review, not `vite preview`).
+ * Preview step for update-employee flows — matches Quick Add review layout (cards + CD rail + sticky footer).
  */
-export default function QuickAddReviewScreen({
+export default function UpdateFlowReviewScreen({
+  title = 'Review & Submit',
+  subtitle = 'Confirm details and CD impact before you submit',
+  breadcrumbs,
+  stepperSteps,
+  stepperCurrentStep,
   employees,
-  onExitReview,
-  onSubmit,
-  onClearDraft,
-  hasDraftOnDisk = false,
   batchSummary,
-  cdBreakdownLines,
-  estimatedCdDraw,
-  cdAfterSubmit,
-  currentCd,
-  draftBanner = '',
+  onBack,
+  onSubmit,
+  submitLabel = 'Submit Endorsement',
+  cdFlow = 'quick-update',
+  cdFlowMeta = {},
+  cdBaselineEmployees,
 }) {
+  // Avoid JSON.stringify(baseline) on every render — large nested objects made preview feel slow.
+  const flowMetaKey = JSON.stringify(cdFlowMeta ?? {})
+  const { cdAfterSubmit, currentCd, estimatedCdDraw, cdBreakdownLines } = useMemo(
+    () =>
+      computeUpdateFlowCdState(employees, {
+        flow: cdFlow,
+        flowMeta: cdFlowMeta ?? {},
+        baselineEmployees: cdBaselineEmployees,
+      }),
+    [employees, cdFlow, flowMetaKey, cdBaselineEmployees],
+  )
+
   return (
-    <div
-      className="h-full flex flex-col min-h-0 px-6 lg:px-8 pt-4 pb-0"
-      data-testid="quick-add-review-screen"
-    >
+    <div className="h-full flex flex-col min-h-0 px-6 lg:px-8 pt-4 pb-0" data-testid="update-flow-review-screen">
       <PageHeader
-        title="Review & Submit"
-        subtitle="Confirm details and CD impact before you submit"
-        breadcrumbs={[
-          { label: 'Add Employee', path: '/add' },
-          { label: 'Quick Add', onClick: onExitReview },
-          { label: 'Preview' },
-        ]}
-        trailing={<Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={2} compact />}
-        onBack={onExitReview}
+        title={title}
+        subtitle={subtitle}
+        breadcrumbs={breadcrumbs}
+        trailing={<Stepper steps={stepperSteps} currentStep={stepperCurrentStep} compact />}
+        onBack={onBack}
         backLabel="Back"
         hideBackButton={false}
       />
-
-      {draftBanner && (
-        <div
-          className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-900"
-          role="status"
-        >
-          {draftBanner}
-        </div>
-      )}
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
         <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2 order-1">
@@ -71,19 +71,9 @@ export default function QuickAddReviewScreen({
         batchSummary={batchSummary}
         actions={
           <>
-            {typeof onClearDraft === 'function' && hasDraftOnDisk && (
-              <button
-                type="button"
-                onClick={onClearDraft}
-                className="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-red-800 bg-white border-2 border-red-200 rounded-xl hover:bg-red-50 hover:border-red-300 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-3 sm:order-1"
-                title="Remove the saved draft from this browser only"
-              >
-                <Trash2 size={18} strokeWidth={2.25} aria-hidden /> Clear draft
-              </button>
-            )}
             <button
               type="button"
-              onClick={onExitReview}
+              onClick={onBack}
               className="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-2 sm:order-2"
             >
               <Pencil size={18} strokeWidth={2.25} aria-hidden /> Edit
@@ -93,7 +83,7 @@ export default function QuickAddReviewScreen({
               onClick={onSubmit}
               className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-1 sm:order-3"
             >
-              <CheckCircle size={18} strokeWidth={2.25} aria-hidden /> Submit Endorsement
+              <CheckCircle size={18} strokeWidth={2.25} aria-hidden /> {submitLabel}
             </button>
           </>
         }

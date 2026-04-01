@@ -35,13 +35,13 @@ export default function BulkUpdate() {
     return (
       <div className="h-full flex items-center justify-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-teal-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Loader2 size={32} className="text-teal-600 animate-spin" />
+          <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Loader2 size={32} className="text-indigo-600 animate-spin" />
           </div>
           <h2 className="text-lg font-bold text-gray-900 mb-1">Processing Upload</h2>
-          <p className="text-sm text-gray-500">Your update file is being validated...</p>
+          <p className="text-sm text-gray-500">Your file is being validated and processed...</p>
           <div className="mt-4 w-48 mx-auto h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-teal-600 rounded-full animate-pulse" style={{ width: '60%' }} />
+            <div className="h-full bg-indigo-600 rounded-full animate-pulse" style={{ width: '60%' }} />
           </div>
         </div>
       </div>
@@ -69,16 +69,22 @@ export default function BulkUpdate() {
         title="Bulk Update"
         subtitle="Upload an Excel file with updated employee details"
         breadcrumbs={[{ label: 'Update Employee', path: '/update' }, { label: 'Bulk Update' }]}
+        trailing={
+          <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} compact />
+        }
       />
-      <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} />
 
-      <div className="max-w-2xl space-y-5">
-        <div className="bg-teal-50 border border-teal-200 rounded-xl p-4 flex items-start gap-3.5">
-          <div className="w-9 h-9 bg-teal-100 rounded-lg flex items-center justify-center flex-shrink-0"><FileSpreadsheet size={18} className="text-teal-600" /></div>
+      <div className="space-y-5">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-start gap-3.5">
+          <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <FileSpreadsheet size={18} className="text-blue-600" />
+          </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold text-teal-900">Download the update template</p>
-            <p className="text-xs text-teal-700 leading-relaxed mt-0.5">Use the template pre-filled with existing employee data, make your changes, then upload.</p>
-            <button className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-teal-700 bg-white border border-teal-200 rounded-lg hover:bg-teal-50 cursor-pointer"><Download size={14} /> Download Template</button>
+            <p className="text-sm font-semibold text-blue-900">Download the template first</p>
+            <p className="text-xs text-blue-700 leading-relaxed mt-0.5">Use the update template pre-filled with existing employee data, make your changes, then upload.</p>
+            <button className="mt-2.5 inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 cursor-pointer">
+              <Download size={14} /> Download Template
+            </button>
           </div>
         </div>
 

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Calculator, Wallet, TrendingDown, AlertCircle, CheckCircle, User, Users, Layers } from 'lucide-react'
+import { Calculator, Wallet, TrendingDown, AlertCircle, CheckCircle, User, Layers, Activity, Package } from 'lucide-react'
 import AnimatedCdAmount from './AnimatedCdAmount'
 import { formatInr, formatInrSigned } from '../lib/currencyFormat'
 import { formSectionBadgeClass } from '../lib/formUi'
@@ -10,23 +10,20 @@ function splitLineLabel(label) {
   return { main: label.slice(0, i).trim(), meta: label.slice(i) }
 }
 
-const LINE_GROUP_ORDER = ['primary', 'dependents', 'secondary']
-const LINE_GROUP_HEADINGS = {
-  primary: 'Employees',
-  dependents: 'Dependents',
-  secondary: 'Secondary GMC',
-}
+const TAX_LINE_IDS = new Set(['subtotal_ex_gst', 'gst', 'total'])
 
-function lineGroupIcon(id) {
+function planLineIcon(id) {
   switch (id) {
-    case 'primary':
+    case 'gmc_base':
       return <User size={12} className="text-violet-600 shrink-0" aria-hidden />
-    case 'dependents':
-      return <Users size={12} className="text-violet-600 shrink-0" aria-hidden />
-    case 'secondary':
+    case 'gpa_base':
+      return <Activity size={12} className="text-sky-600 shrink-0" aria-hidden />
+    case 'gmc_secondary':
       return <Layers size={12} className="text-violet-600 shrink-0" aria-hidden />
+    case 'gmc_addons':
+      return <Package size={12} className="text-violet-600 shrink-0" aria-hidden />
     default:
-      return null
+      return <User size={12} className="text-violet-600 shrink-0" aria-hidden />
   }
 }
 
@@ -48,56 +45,73 @@ function PremiumLineRow({ line }) {
   )
 }
 
-/** Grouped line items inside a contained panel for scanability. */
-function PremiumLinesGrouped({ lines, primaryBatchCount = 0 }) {
-  const detailLines = lines.filter((l) => l.id !== 'total')
-  if (detailLines.length === 0) {
+/** Plan-basis lines + ex-GST subtotal + GST inside one panel. */
+function PlanPremiumBreakdown({ lines }) {
+  const planLines = lines.filter((l) => !TAX_LINE_IDS.has(l.id))
+  const subLine = lines.find((l) => l.id === 'subtotal_ex_gst')
+  const gstLine = lines.find((l) => l.id === 'gst')
+
+  if (planLines.length === 0) {
     return (
       <p className="text-[11px] text-gray-500 leading-snug px-1 py-2">
-        Add employees or dependents to see lines.
+        Add employees with plans (or dependents on GMC) to see premium lines.
       </p>
     )
   }
 
-  const byId = Object.fromEntries(detailLines.map((l) => [l.id, l]))
-
   return (
     <div className="rounded-lg border border-violet-100/90 bg-violet-50/40 px-2 sm:px-2.5 divide-y divide-violet-100/80">
-      {LINE_GROUP_ORDER.map((id) => {
-        const line = byId[id]
-        if (!line) return null
-        let heading = LINE_GROUP_HEADINGS[id] || line.label
-        if (id === 'primary' && primaryBatchCount > 0) {
-          heading = `Primary employees (${primaryBatchCount})`
-        }
-        return (
-          <div key={id} className="py-2 first:pt-2.5 last:pb-2.5">
-            <div className="flex items-center gap-1.5 mb-1">
-              {lineGroupIcon(id)}
-              <span className="text-[9px] font-semibold uppercase tracking-wide text-violet-800/75">
-                {heading}
-              </span>
-            </div>
+      {planLines.map((line) => (
+        <div key={line.id} className="flex items-start gap-2 py-2 first:pt-2.5 last:pb-2.5">
+          <span className="mt-0.5">{planLineIcon(line.id)}</span>
+          <div className="min-w-0 flex-1">
             <PremiumLineRow line={line} />
           </div>
-        )
-      })}
+        </div>
+      ))}
+      {(subLine || gstLine) && (
+        <div className="py-2.5 space-y-1.5">
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-gray-500 px-0.5">Taxes</p>
+          {subLine ? (
+            <div className="flex justify-between gap-3 text-[11px] leading-snug text-gray-600">
+              <span>{subLine.label}</span>
+              <AnimatedCdAmount
+                value={subLine.amount}
+                className="flex-shrink-0 tabular-nums font-medium text-gray-800 text-right"
+              >
+                {formatInr(subLine.amount)}
+              </AnimatedCdAmount>
+            </div>
+          ) : null}
+          {gstLine ? (
+            <div className="flex justify-between gap-3 text-[11px] leading-snug text-gray-600">
+              <span>{gstLine.label}</span>
+              <AnimatedCdAmount
+                value={gstLine.amount}
+                className="flex-shrink-0 tabular-nums font-medium text-gray-800 text-right"
+              >
+                {formatInr(gstLine.amount)}
+              </AnimatedCdAmount>
+            </div>
+          ) : null}
+        </div>
+      )}
     </div>
   )
 }
 
 /** Compact breakdown for popovers / tooltips. */
-export function CdBreakdownPopoverBody({ lines, primaryBatchCount = 0 }) {
+export function CdBreakdownPopoverBody({ lines, primaryBatchCount: _primaryBatchCount = 0 }) {
   const totalLine = lines.find((l) => l.id === 'total')
   return (
     <div>
       <p className="text-[11px] font-semibold text-gray-800 border-b border-gray-100 pb-2 mb-2">
-        Estimated premium (pro-rata)
+        Estimated premium (pro-rata, incl. GST)
       </p>
-      <PremiumLinesGrouped lines={lines} primaryBatchCount={primaryBatchCount} />
+      <PlanPremiumBreakdown lines={lines} />
       {totalLine && (
         <div className="flex justify-between gap-3 pt-2.5 mt-2.5 border-t border-gray-200">
-          <span className="text-xs font-bold text-gray-900">Total (est.)</span>
+          <span className="text-xs font-bold text-gray-900">Total (incl. GST)</span>
           <AnimatedCdAmount
             value={totalLine.amount}
             className="text-xs font-bold text-violet-700 tabular-nums"
@@ -114,14 +128,14 @@ export function CdBreakdownPopoverBody({ lines, primaryBatchCount = 0 }) {
  * Premium line breakdown + CD wallet math + status.
  * `variant="card"` — sidebar / review rail. `variant="embedded"` — inside bottom sticky emerald shell.
  * `estimateReady` — when false, hides pro-rata breakdown and batch CD impact until user runs Calculate premium.
+ * `primaryBatchCount` — unused; kept for call-site compatibility.
  */
 export default function CdBalanceFormWidget({
   cdAfterSubmit,
   currentCd,
   estimatedCdDraw,
   lines,
-  policyDaysRemaining,
-  primaryBatchCount = 0,
+  primaryBatchCount: _primaryBatchCount = 0,
   estimateReady = true,
   variant = 'card',
   className = '',
@@ -166,19 +180,9 @@ export default function CdBalanceFormWidget({
             <h3 className="text-sm font-bold text-gray-900 tracking-tight leading-snug">
               Premium &amp; CD impact (est.)
             </h3>
-            {policyDaysRemaining != null && (
-              <p className="text-[10px] text-gray-500 mt-0.5">
-                {policyDaysRemaining} day{policyDaysRemaining === 1 ? '' : 's'} remaining in policy
-              </p>
-            )}
           </div>
         </div>
       </div>
-      <p className="text-[11px] text-gray-500 mt-1.5 leading-snug">
-        {estimateReady
-          ? 'Pro-rata estimate after calculate — use Recalculate if you change the batch.'
-          : 'Calculate premium below to load pro-rata lines and CD impact for this batch.'}
-      </p>
     </div>
   )
 
@@ -221,11 +225,11 @@ export default function CdBalanceFormWidget({
       {/* Section A — Premium breakdown */}
       <div>
         <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-500 mb-2">
-          Estimated premium (pro-rata)
+          Estimated premium (pro-rata, incl. GST)
         </p>
-        <PremiumLinesGrouped lines={lines} primaryBatchCount={primaryBatchCount} />
+        <PlanPremiumBreakdown lines={lines} />
         <div className="flex items-end justify-between gap-3 pt-3 mt-3 border-t border-gray-200">
-          <span className="text-xs font-bold text-gray-900 leading-tight">Total premium (pro-rata)</span>
+          <span className="text-xs font-bold text-gray-900 leading-tight">Total premium (incl. GST)</span>
           <AnimatedCdAmount
             value={totalPremium}
             className="text-base font-bold text-violet-700 tabular-nums leading-none"

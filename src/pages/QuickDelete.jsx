@@ -128,8 +128,8 @@ export default function QuickDelete() {
             title="Quick Delete"
             subtitle="Review all details before confirming"
             breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
+            trailing={<Stepper steps={STEPS} currentStep={3} compact />}
           />
-          <Stepper steps={STEPS} currentStep={3} />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-4">
@@ -206,8 +206,8 @@ export default function QuickDelete() {
             title="Quick Delete"
             subtitle={`Assign date of leaving and reason for ${selectedEmployees.length} employee${selectedEmployees.length > 1 ? 's' : ''}`}
             breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
+            trailing={<Stepper steps={STEPS} currentStep={2} compact />}
           />
-          <Stepper steps={STEPS} currentStep={2} />
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto pb-4">
@@ -371,8 +371,8 @@ export default function QuickDelete() {
           title="Quick Delete"
           subtitle="Select employees to remove from the group policy"
           breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
+          trailing={<Stepper steps={STEPS} currentStep={1} compact />}
         />
-        <Stepper steps={STEPS} currentStep={1} />
       </div>
 
       <div className="flex-1 min-h-0 overflow-y-auto pb-4">
@@ -392,15 +392,48 @@ export default function QuickDelete() {
           )}
         </div>
 
+        {/* Selected employees — directly under search */}
+        <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden mb-4">
+          <button type="button" onClick={() => setSelectionPanelOpen(p => !p)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50/50 transition-colors cursor-pointer">
+            <div className="flex items-center gap-2.5">
+              <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center">
+                <span className="text-xs font-bold text-indigo-700">{selectedIds.size}</span>
+              </div>
+              <span className="text-sm font-semibold text-gray-900">Selected Employees</span>
+            </div>
+            {selectionPanelOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+          </button>
+          {selectionPanelOpen && (
+            <div className="border-t border-indigo-100 px-5 py-3">
+              {selectedIds.size === 0 ? (
+                <p className="text-sm text-gray-500">No employees selected yet. Use the table below to add selections.</p>
+              ) : (
+                <>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEmployees.map(emp => (
+                      <span key={emp.id} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 text-sm bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
+                        <span className="font-medium">{emp.name}</span>
+                        <span className="text-indigo-400 text-xs">{emp.id}</span>
+                        <button type="button" onClick={() => toggleOne(emp.id)} className="ml-0.5 p-0.5 text-indigo-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors cursor-pointer"><X size={13} /></button>
+                      </span>
+                    ))}
+                  </div>
+                  <button type="button" onClick={() => setSelectedIds(new Set())} className="mt-2.5 text-xs font-medium text-red-600 hover:text-red-700 cursor-pointer">Clear all</button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
         {/* Quick Tip */}
         <div className="flex items-start gap-2.5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl mb-4">
           <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
           <p className="text-xs text-amber-800 leading-relaxed">
-            <span className="font-semibold">Quick Tip:</span> Select multiple employees at once using checkboxes, or use the "Select All" button to select all visible employees. You can customize individual deletion details in the next step.
+            <span className="font-semibold">Quick Tip:</span> Select multiple employees at once using checkboxes, or use the &quot;Select All&quot; button to select all visible employees. You can customize individual deletion details in the next step.
           </p>
         </div>
 
-        {errors.selection && <p className="text-xs text-red-500 mb-3 -mt-2">{errors.selection}</p>}
+        {errors.selection && <p className="text-xs text-red-500 mb-3">{errors.selection}</p>}
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
           <div className="overflow-x-auto">
@@ -440,33 +473,6 @@ export default function QuickDelete() {
             </table>
           </div>
         </div>
-
-        {/* Selected items panel */}
-        {selectedIds.size > 0 && (
-          <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden mb-4">
-            <button onClick={() => setSelectionPanelOpen(p => !p)} className="w-full flex items-center justify-between px-5 py-3 hover:bg-gray-50/50 transition-colors cursor-pointer">
-              <div className="flex items-center gap-2.5">
-                <div className="w-7 h-7 bg-indigo-100 rounded-full flex items-center justify-center"><span className="text-xs font-bold text-indigo-700">{selectedIds.size}</span></div>
-                <span className="text-sm font-semibold text-gray-900">Selected Employees</span>
-              </div>
-              {selectionPanelOpen ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
-            </button>
-            {selectionPanelOpen && (
-              <div className="border-t border-indigo-100 px-5 py-3">
-                <div className="flex flex-wrap gap-2">
-                  {selectedEmployees.map(emp => (
-                    <span key={emp.id} className="inline-flex items-center gap-1.5 pl-3 pr-1.5 py-1.5 text-sm bg-indigo-50 text-indigo-800 border border-indigo-200 rounded-full">
-                      <span className="font-medium">{emp.name}</span>
-                      <span className="text-indigo-400 text-xs">{emp.id}</span>
-                      <button onClick={() => toggleOne(emp.id)} className="ml-0.5 p-0.5 text-indigo-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors cursor-pointer"><X size={13} /></button>
-                    </span>
-                  ))}
-                </div>
-                <button onClick={() => setSelectedIds(new Set())} className="mt-2.5 text-xs font-medium text-red-600 hover:text-red-700 cursor-pointer">Clear all</button>
-              </div>
-            )}
-          </div>
-        )}
       </div>
 
       <div className="flex-shrink-0 bg-white border-t border-gray-200 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3.5 flex items-center justify-between">

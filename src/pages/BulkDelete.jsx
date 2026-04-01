@@ -69,10 +69,12 @@ export default function BulkDelete() {
         title="Bulk Deletion"
         subtitle="Upload a file with employee IDs to remove in bulk"
         breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Bulk Deletion' }]}
+        trailing={
+          <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} compact />
+        }
       />
-      <Stepper steps={['Download Template', 'Upload File', 'Processing']} currentStep={file ? 2 : 1} />
 
-      <div className="max-w-2xl space-y-5">
+      <div className="space-y-5">
         <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3.5">
           <div className="w-9 h-9 bg-red-100 rounded-lg flex items-center justify-center flex-shrink-0"><FileSpreadsheet size={18} className="text-red-600" /></div>
           <div className="flex-1">

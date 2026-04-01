@@ -34,6 +34,7 @@ import {
   formatEmployeeIssueTooltip,
   buildQuickAddErrorBannerSummary,
 } from '../lib/quickAddValidation'
+import { buildQuickAddPremiumBreakdown } from '../lib/quickAddPremiumEstimate'
 
 /** Sidebar / header CD column — +10px vs previous 19rem / 21rem cap. */
 const CD_RAIL_WIDTH_CLASS = 'w-[min(calc(19rem+10px),32vw)] max-w-[calc(21rem+10px)]'
@@ -64,9 +65,6 @@ function fieldCount(emp) {
 
 /** Replace with API / context in production */
 const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
-/** Illustrative policy context for CD / premium panel header */
-const MOCK_POLICY_DAYS_LEFT = 9
-
 const CD_BALANCE_VISIBLE_KEY = 'quickAdd_cdBalanceVisible'
 const CD_PLACEMENT_STORAGE_KEY = 'quickAdd_cdPlacement'
 
@@ -88,56 +86,6 @@ function readStoredCdPlacement() {
     /* private mode / unavailable */
   }
   return 'sidebar'
-}
-
-const CD_EST_PRIMARY_COMPLETE_RUPEES = 42_000
-const CD_EST_PRIMARY_PARTIAL_RUPEES = 18_000
-const CD_EST_PER_DEPENDENT_RUPEES = 14_000
-const CD_EST_SECONDARY_BUMP_RUPEES = 6_000
-
-/**
- * Single pass: totals must match prior estimateCdDrawRupees behavior.
- * @returns {{ total: number, lines: { id: string, label: string, amount: number }[] }}
- */
-function estimateCdDrawBreakdown(employees) {
-  let primaryTotal = 0
-  let dependentLives = 0
-  let dependentTotal = 0
-  let secondaryTotal = 0
-
-  for (const emp of employees) {
-    if (isBasicComplete(emp)) {
-      primaryTotal += CD_EST_PRIMARY_COMPLETE_RUPEES
-    } else if (isFilled(emp)) {
-      primaryTotal += CD_EST_PRIMARY_PARTIAL_RUPEES
-    }
-    const dc = emp.dependents?.length || 0
-    dependentLives += dc
-    dependentTotal += dc * CD_EST_PER_DEPENDENT_RUPEES
-    if (emp.plans?.gmcSecondaryPlan && emp.plans.gmcSecondaryPlan !== 'none') {
-      secondaryTotal += CD_EST_SECONDARY_BUMP_RUPEES
-    }
-  }
-
-  const total = primaryTotal + dependentTotal + secondaryTotal
-
-  const lines = []
-  if (primaryTotal > 0) {
-    lines.push({ id: 'primary', label: 'Primary premium (pro-rata)', amount: primaryTotal })
-  }
-  if (dependentTotal > 0) {
-    lines.push({
-      id: 'dependents',
-      label: `Dependents (${dependentLives} ${dependentLives === 1 ? 'life' : 'lives'})`,
-      amount: dependentTotal,
-    })
-  }
-  if (secondaryTotal > 0) {
-    lines.push({ id: 'secondary', label: 'Secondary GMC', amount: secondaryTotal })
-  }
-  lines.push({ id: 'total', label: 'Est. total (batch)', amount: total })
-
-  return { total, lines }
 }
 
 export default function QuickAdd() {
@@ -169,10 +117,10 @@ export default function QuickAdd() {
   const suppressPremiumStaleOnce = useRef(false)
 
   const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines } = useMemo(() => {
-    const { total, lines } = estimateCdDrawBreakdown(employees)
+    const { totalInclGst, lines } = buildQuickAddPremiumBreakdown(employees)
     return {
-      estimatedCdDraw: total,
-      cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES - total,
+      estimatedCdDraw: totalInclGst,
+      cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES - totalInclGst,
       cdBreakdownLines: lines,
     }
   }, [employees])
@@ -915,7 +863,6 @@ export default function QuickAdd() {
       currentCd={MOCK_CD_AVAILABLE_RUPEES}
       estimatedCdDraw={estimatedCdDraw}
       lines={cdBreakdownLines}
-      policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
       primaryBatchCount={employees.length}
       estimateReady={cdEstimateReady}
     />
@@ -947,7 +894,6 @@ export default function QuickAdd() {
           currentCd={MOCK_CD_AVAILABLE_RUPEES}
           estimatedCdDraw={estimatedCdDraw}
           lines={cdBreakdownLines}
-          policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
           primaryBatchCount={employees.length}
           estimateReady={cdEstimateReady}
         />
@@ -966,7 +912,6 @@ export default function QuickAdd() {
         estimatedCdDraw={estimatedCdDraw}
         cdAfterSubmit={cdAfterSubmit}
         currentCd={MOCK_CD_AVAILABLE_RUPEES}
-        policyDaysRemaining={MOCK_POLICY_DAYS_LEFT}
         draftBanner={draftBanner}
         onClearDraft={handleClearDraft}
         hasDraftOnDisk={hasDraftOnDisk}

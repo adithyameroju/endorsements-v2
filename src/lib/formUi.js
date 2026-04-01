@@ -17,3 +17,13 @@ export const formControlClass =
   'w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white transition-colors min-h-[2.75rem] box-border'
 
 export const formControlErrorClass = 'border-red-300 bg-red-50/30'
+
+/** Section shells aligned with Quick Add Employees (left accent + white card). */
+export const updateFormSectionShell = {
+  basic:
+    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500',
+  plans:
+    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500',
+  dependents:
+    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500',
+}
