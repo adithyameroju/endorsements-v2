@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Calculator, Wallet, TrendingDown, AlertCircle, CheckCircle, User, Layers, Activity, Package } from 'lucide-react'
+import { Calculator, Wallet, TrendingDown, TrendingUp, AlertCircle, CheckCircle, User, Layers, Activity, Package } from 'lucide-react'
 import AnimatedCdAmount from './AnimatedCdAmount'
 import { formatInr, formatInrSigned } from '../lib/currencyFormat'
 import { formSectionBadgeClass } from '../lib/formUi'
@@ -139,6 +139,13 @@ export default function CdBalanceFormWidget({
   estimateReady = true,
   variant = 'card',
   className = '',
+  /** Shown when estimate is ready and CD is insufficient (e.g. demo “recharge” flows). */
+  rechargeCtaLabel,
+  onRechargeClick,
+  /** When true, second row shows CD credit (refund) and positive impact on balance (e.g. quick delete). */
+  creditMode = false,
+  /** Replaces default “Calculate premium / Preview” hint when estimate is not ready. */
+  estimatePendingHint,
 }) {
   const prevSig = useRef(null)
   const [panelFlash, setPanelFlash] = useState(false)
@@ -163,7 +170,7 @@ export default function CdBalanceFormWidget({
 
   const totalLine = lines.find((l) => l.id === 'total')
   const totalPremium = totalLine?.amount ?? estimatedCdDraw
-  const isSufficient = cdAfterSubmit >= 0
+  const isSufficient = creditMode ? true : cdAfterSubmit >= 0
 
   const headerBlock = (
     <div className={variant === 'card' ? '' : 'pb-1 border-b border-emerald-200/50 mb-1'}>
@@ -211,8 +218,14 @@ export default function CdBalanceFormWidget({
           />
           <p className="text-[11px] font-semibold text-gray-900">Estimate not loaded yet</p>
           <p className="text-[10px] text-gray-600 mt-1 leading-snug">
-            Click <span className="font-semibold text-gray-800">Calculate premium</span> in the footer, then you can open{' '}
-            <span className="font-semibold text-gray-800">Preview &amp; Submit</span>.
+            {estimatePendingHint ? (
+              estimatePendingHint
+            ) : (
+              <>
+                Click <span className="font-semibold text-gray-800">Calculate premium</span> in the footer, then you can open{' '}
+                <span className="font-semibold text-gray-800">Preview &amp; Submit</span>.
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -252,11 +265,23 @@ export default function CdBalanceFormWidget({
         </div>
         <div className="flex items-center justify-between gap-2 text-[11px]">
           <span className="flex items-center gap-1.5 text-slate-700 font-medium min-w-0">
-            <TrendingDown size={13} className="text-slate-500 shrink-0" aria-hidden />
-            Est. deduction
+            {creditMode ? (
+              <>
+                <TrendingUp size={13} className="text-emerald-600 shrink-0" aria-hidden />
+                Est. CD credit (refund)
+              </>
+            ) : (
+              <>
+                <TrendingDown size={13} className="text-slate-500 shrink-0" aria-hidden />
+                Est. deduction
+              </>
+            )}
           </span>
-          <AnimatedCdAmount value={estimatedCdDraw} className="font-semibold text-slate-800 tabular-nums shrink-0">
-            −{formatInr(estimatedCdDraw)}
+          <AnimatedCdAmount
+            value={estimatedCdDraw}
+            className={`font-semibold tabular-nums shrink-0 ${creditMode ? 'text-emerald-700' : 'text-slate-800'}`}
+          >
+            {creditMode ? `+${formatInr(estimatedCdDraw)}` : `−${formatInr(estimatedCdDraw)}`}
           </AnimatedCdAmount>
         </div>
         <hr className="border-gray-200 my-1" />
@@ -274,12 +299,19 @@ export default function CdBalanceFormWidget({
       {/* Section C — Status */}
       <div
         className={`rounded-lg px-3 py-2.5 text-[11px] font-medium flex items-start gap-2 leading-snug border ${
-          isSufficient
-            ? 'bg-violet-50/95 text-violet-900 border-violet-200/80'
-            : 'bg-red-50/95 text-red-900 border-red-200/80'
+          creditMode
+            ? 'bg-emerald-50/95 text-emerald-900 border-emerald-200/80'
+            : isSufficient
+              ? 'bg-violet-50/95 text-violet-900 border-violet-200/80'
+              : 'bg-red-50/95 text-red-900 border-red-200/80'
         }`}
       >
-        {isSufficient ? (
+        {creditMode ? (
+          <>
+            <CheckCircle size={14} className="text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+            <span>CD balance improves after this removal (est.).</span>
+          </>
+        ) : isSufficient ? (
           <>
             <CheckCircle size={14} className="text-violet-600 shrink-0 mt-0.5" aria-hidden />
             <span>Enough CD for this batch (est.).</span>
@@ -287,10 +319,23 @@ export default function CdBalanceFormWidget({
         ) : (
           <>
             <AlertCircle size={14} className="text-red-600 shrink-0 mt-0.5" aria-hidden />
-            <span>Not enough CD (est.) — adjust plans or funding.</span>
+            <span className="min-w-0">
+              {onRechargeClick
+                ? 'Not enough CD (est.) — recharge your wallet or reduce this batch before submitting.'
+                : 'Not enough CD (est.) — adjust plans or funding.'}
+            </span>
           </>
         )}
       </div>
+      {!isSufficient && estimateReady && rechargeCtaLabel && typeof onRechargeClick === 'function' && (
+        <button
+          type="button"
+          onClick={onRechargeClick}
+          className="w-full rounded-lg border border-red-200 bg-white px-3 py-2 text-center text-[11px] font-semibold text-red-800 shadow-sm hover:bg-red-50 cursor-pointer transition-colors"
+        >
+          {rechargeCtaLabel}
+        </button>
+      )}
     </>
   )
 

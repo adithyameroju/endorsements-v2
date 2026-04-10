@@ -1,4 +1,4 @@
-import { User, Heart, Users } from 'lucide-react'
+import { User, Heart, Users, Ban, UserMinus } from 'lucide-react'
 import { getPlanSummaryParts, dependentPlanSummaryLine } from '../lib/planHelpers'
 
 function PF({ label, value }) {
@@ -20,12 +20,24 @@ function getRelationIcon(relation) {
   return <User size={14} className="text-gray-500" />
 }
 
+function formatReviewDate(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
 /** Same review cards as Quick Add “Preview & Submit”. */
 export default function ReviewEmployeesPanel({ employees }) {
   return (
     <>
       {employees.map((emp, idx) => {
         const planParts = getPlanSummaryParts(emp.plans || {})
+        const deps = emp.dependents || []
+        const removingCount = deps.filter((d) => d.removalScheduled).length
+        const activeDepCount = deps.length - removingCount
         return (
           <div
             key={emp.id ?? idx}
@@ -68,30 +80,94 @@ export default function ReviewEmployeesPanel({ employees }) {
                   <span className="text-[11px] text-gray-400">—</span>
                 )}
               </div>
-              {(emp.dependents?.length ?? 0) > 0 && (
+              {removingCount > 0 && (
+                <div className="mt-2.5 rounded-lg border border-rose-200/90 bg-rose-50/50 px-3 py-2.5">
+                  <div className="flex items-start gap-2">
+                    <UserMinus size={14} className="text-rose-600 shrink-0 mt-0.5" aria-hidden />
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold text-rose-900 uppercase tracking-wide mb-1">
+                        Change to employee profile &amp; cover
+                      </p>
+                      {removingCount === 1 ? (
+                        <p className="text-[11px] text-rose-950/90 leading-relaxed">
+                          <span className="font-semibold">{deps.find((d) => d.removalScheduled)?.name || 'This dependent'}</span>
+                          {' '}
+                          will be <span className="font-semibold">removed from this employee&apos;s profile</span> and dropped from
+                          group cover effective{' '}
+                          <span className="font-semibold whitespace-nowrap">
+                            {formatReviewDate(deps.find((d) => d.removalScheduled)?.removalEffectiveDate)}
+                          </span>
+                          .
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-rose-950/90 leading-relaxed">
+                          <span className="font-semibold">{removingCount} dependents</span> will be{' '}
+                          <span className="font-semibold">removed from this employee&apos;s profile</span> and dropped from group
+                          cover on the effective dates listed under each person below.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+              {deps.length > 0 && (
                 <div className="mt-2.5 pt-2.5 border-t border-gray-100">
                   <p className="text-[10px] font-semibold uppercase tracking-wide text-gray-400 mb-1.5">
-                    Dependents ({emp.dependents.length})
+                    Dependents ({deps.length}
+                    {removingCount > 0 && (
+                      <span className="font-normal text-gray-500 normal-case">
+                        {' '}
+                        · {activeDepCount} active, {removingCount} scheduled removal
+                      </span>
+                    )}
+                    )
                   </p>
-                  <ul className="space-y-1">
-                    {(emp.dependents || []).map((dep, di) => (
-                      <li
-                        key={dep.id ?? di}
-                        className="flex items-start gap-2 text-[11px] text-gray-700 leading-snug"
-                      >
-                        <span className="flex-shrink-0 mt-0.5 text-indigo-500">
-                          {getRelationIcon(dep.relation)}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="font-medium text-gray-900">{dep.name || '—'}</span>
-                          <span className="text-gray-400"> · </span>
-                          <span className="text-gray-600">{dep.relation || '—'}</span>
-                          <span className="block text-[10px] text-gray-500 mt-0.5">
-                            {dependentPlanSummaryLine(dep, emp.plans)}
+                  <ul className="space-y-2">
+                    {deps.map((dep, di) => {
+                      const scheduled = !!dep.removalScheduled
+                      return (
+                        <li
+                          key={dep.id ?? di}
+                          className={
+                            scheduled
+                              ? 'flex items-start gap-2 text-[11px] leading-snug rounded-lg border border-dashed border-rose-200 bg-rose-50/50 px-2.5 py-2 text-rose-950/90'
+                              : 'flex items-start gap-2 text-[11px] text-gray-700 leading-snug'
+                          }
+                        >
+                          <span className={`flex-shrink-0 mt-0.5 ${scheduled ? 'text-rose-500' : 'text-indigo-500'}`}>
+                            {scheduled ? <Ban size={14} aria-hidden /> : getRelationIcon(dep.relation)}
                           </span>
-                        </span>
-                      </li>
-                    ))}
+                          <span className="min-w-0">
+                            <span className={`font-medium ${scheduled ? 'text-rose-900/90 line-through decoration-rose-300' : 'text-gray-900'}`}>
+                              {dep.name || '—'}
+                            </span>
+                            <span className="text-gray-400"> · </span>
+                            <span className={scheduled ? 'text-rose-800/80' : 'text-gray-600'}>{dep.relation || '—'}</span>
+                            {scheduled ? (
+                              <>
+                                <span className="block text-[10px] font-semibold text-rose-800 mt-0.5">
+                                  Removing effective {formatReviewDate(dep.removalEffectiveDate)}
+                                </span>
+                                <span className="block text-[10px] text-rose-700/70 mt-0.5">
+                                  {dependentPlanSummaryLine(dep, emp.plans)}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                {dep.coverageEffectiveDate && (
+                                  <span className="block text-[10px] text-gray-500 mt-0.5">
+                                    Cover from {formatReviewDate(dep.coverageEffectiveDate)}
+                                  </span>
+                                )}
+                                <span className="block text-[10px] text-gray-500 mt-0.5">
+                                  {dependentPlanSummaryLine(dep, emp.plans)}
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        </li>
+                      )
+                    })}
                   </ul>
                 </div>
               )}

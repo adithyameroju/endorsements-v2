@@ -1,22 +1,30 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, User, CheckCircle, Sparkles, Users } from 'lucide-react'
+import { Search, User, CheckCircle, Sparkles, Users, Calculator, Eye } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
 import DependentForm from '../components/DependentForm'
 import QuickAddBatchStickyFooter from '../components/QuickAddBatchStickyFooter'
 import UpdateFlowReviewScreen from '../components/UpdateFlowReviewScreen'
-import { mockEmployees, departments, designations } from '../data/mockData'
+import { mockEmployees } from '../data/mockData'
 import { useEndorsements } from '../store/EndorsementStore'
 import { cloneEmployeeGmcPlans } from '../lib/planHelpers'
+import CdBalanceFormWidget from '../components/CdBalanceFormWidget'
 import {
   mergeDemoEmployeePlans,
   buildQuickUpdatePremiumEmployees,
   buildQuickUpdateCdBaselineEmployee,
+  computeUpdateFlowCdState,
 } from '../lib/updateFlowPremium'
 import { formSectionTitleClass, formSectionBadgeClass, updateFormSectionShell, formFieldLabelClass, formControlClass } from '../lib/formUi'
 import { quickUpdateBatchSummary } from '../lib/updateFlowBatchSummary'
+
+const CD_RAIL_WIDTH_CLASS = 'w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)]'
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export default function QuickUpdate() {
   const navigate = useNavigate()
@@ -27,6 +35,8 @@ export default function QuickUpdate() {
   const [formData, setFormData] = useState(null)
   const [showPreview, setShowPreview] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+  const [premiumFlow, setPremiumFlow] = useState('fresh')
+  const isFirstFormDataEffect = useRef(true)
 
   const filteredEmployees = mockEmployees.filter(emp =>
     emp.name.toLowerCase().includes(query.toLowerCase()) ||
@@ -47,6 +57,26 @@ export default function QuickUpdate() {
     return [buildQuickUpdateCdBaselineEmployee(formData, selectedEmployee)]
   }, [showPreview, selectedEmployee, formData])
 
+  const formCdState = useMemo(() => {
+    if (!formData || !selectedEmployee) return null
+    const employees = buildQuickUpdatePremiumEmployees(formData)
+    const baseline = [buildQuickUpdateCdBaselineEmployee(formData, selectedEmployee)]
+    return computeUpdateFlowCdState(employees, {
+      flow: 'quick-update',
+      baselineEmployees: baseline,
+    })
+  }, [formData, selectedEmployee])
+
+  useEffect(() => {
+    if (isFirstFormDataEffect.current) {
+      isFirstFormDataEffect.current = false
+      return
+    }
+    setPremiumFlow((f) => (f === 'calculated' ? 'stale' : f))
+  }, [formData])
+
+  const cdEstimateReadyForm = premiumFlow === 'calculated'
+
   const selectEmployee = (emp) => {
     setSelectedEmployee(emp)
     const merged = mergeDemoEmployeePlans(emp)
@@ -64,11 +94,14 @@ export default function QuickUpdate() {
           gender: 'Female',
           samePlansAsEmployee: true,
           plans: cloneEmployeeGmcPlans(merged),
+          coverageEffectiveDate: todayIsoDate(),
         },
       ],
     })
     setShowResults(false)
     setShowPreview(false)
+    setPremiumFlow('fresh')
+    isFirstFormDataEffect.current = true
     setQuery(emp.name)
   }
 
@@ -103,6 +136,7 @@ export default function QuickUpdate() {
           gender: 'Female',
           samePlansAsEmployee: true,
           plans: cloneEmployeeGmcPlans(plans),
+          coverageEffectiveDate: todayIsoDate(),
         },
       ],
     })
@@ -112,10 +146,27 @@ export default function QuickUpdate() {
     const details = selectedEmployee ? [{
       name: selectedEmployee.name,
       id: selectedEmployee.id,
-      department: selectedEmployee.department,
-      designation: selectedEmployee.designation,
     }] : []
-    addEntry({ action: 'Update Employee', count: 1, status: 'Success', type: 'quick', details })
+    addEntry({
+      action: 'Update Employee',
+      count: 1,
+      status: 'Success',
+      type: 'quick',
+      details,
+      changeSummary: {
+        title: 'Employee record updated',
+        lines: selectedEmployee ? [`${selectedEmployee.name} (${selectedEmployee.id})`] : [],
+      },
+      premiumSummary: {
+        totalInclGst: 45200,
+        gstRatePercent: 18,
+        lines: [
+          { label: 'Incremental premium (mock)', amount: 38305 },
+          { label: 'GST (18%)', amount: 6895 },
+          { label: 'Total (incl. GST)', amount: 45200 },
+        ],
+      },
+    })
     setSubmitted(true)
     setTimeout(() => navigate('/'), 2000)
   }
@@ -154,6 +205,7 @@ export default function QuickUpdate() {
         submitLabel="Submit Endorsement"
         cdFlow="quick-update"
         cdBaselineEmployees={reviewCdBaseline}
+        cdEstimateReady
       />
     )
   }
@@ -212,7 +264,7 @@ export default function QuickUpdate() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">{emp.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.email} &middot; {emp.department}</p>
+                      <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.email}</p>
                     </div>
                   </button>
                 ))
@@ -224,8 +276,8 @@ export default function QuickUpdate() {
 
       {formData && (
         <>
-          <div className="flex-1 min-h-0 flex flex-col min-h-0">
-            <div className="flex-1 min-h-0 rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col lg:self-stretch rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-4">
                 <section className={updateFormSectionShell.basic}>
                   <div className="flex items-center justify-between mb-4">
@@ -239,9 +291,7 @@ export default function QuickUpdate() {
                     <Field label="Employee ID" value={formData.id} onChange={v => updateField('id', v)} disabled />
                     <Field label="Email" value={formData.email} onChange={v => updateField('email', v)} />
                     <Field label="Date of Birth" type="date" value={formData.dob} onChange={v => updateField('dob', v)} />
-                    <SelectField label="Designation" value={formData.designation} onChange={v => updateField('designation', v)} options={designations} />
                     <SelectField label="Gender" value={formData.gender} onChange={v => updateField('gender', v)} options={['Male', 'Female', 'Other']} />
-                    <SelectField label="Department" value={formData.department} onChange={v => updateField('department', v)} options={departments} />
                     <Field label="Date of Joining" type="date" value={formData.doj} onChange={v => updateField('doj', v)} />
                     <Field label="Mobile Number" value={formData.mobile} onChange={v => updateField('mobile', v)} />
                   </div>
@@ -265,33 +315,104 @@ export default function QuickUpdate() {
                       </div>
                       Dependents
                     </h3>
-                    {formData.dependents?.length > 0 && (
-                      <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-full">
-                        {formData.dependents.length} added
-                      </span>
-                    )}
+                    {formData.dependents?.length > 0 && (() => {
+                      const d = formData.dependents
+                      const removing = d.filter((x) => x.removalScheduled).length
+                      const active = d.length - removing
+                      return (
+                        <span className="inline-flex flex-wrap items-center gap-1.5">
+                          {active > 0 && (
+                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">
+                              {active} on cover
+                            </span>
+                          )}
+                          {removing > 0 && (
+                            <span className="text-xs font-semibold text-rose-800 bg-rose-50 border border-rose-100 px-2.5 py-1 rounded-full">
+                              {removing} scheduled removal
+                            </span>
+                          )}
+                        </span>
+                      )
+                    })()}
                   </div>
-                  <DependentForm dependents={formData.dependents} onChange={(deps) => updateField('dependents', deps)} employeePlans={formData.plans} hideSectionTitle />
+                  <DependentForm
+                    dependents={formData.dependents}
+                    onChange={(deps) => updateField('dependents', deps)}
+                    employeePlans={formData.plans}
+                    hideSectionTitle
+                    showCoverageEffectiveDate
+                    requireRemovalEffectiveDate
+                  />
                 </section>
               </div>
             </div>
+            {formCdState && (
+              <aside
+                className={`${CD_RAIL_WIDTH_CLASS} shrink-0 lg:min-h-0 flex flex-col lg:self-stretch`}
+                aria-label="CD balance estimate"
+              >
+                <div className="flex flex-col flex-1 min-h-0 lg:sticky lg:top-4 lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+                  <CdBalanceFormWidget
+                    cdAfterSubmit={formCdState.cdAfterSubmit}
+                    currentCd={formCdState.currentCd}
+                    estimatedCdDraw={formCdState.estimatedCdDraw}
+                    lines={formCdState.cdBreakdownLines}
+                    primaryBatchCount={1}
+                    estimateReady={cdEstimateReadyForm}
+                  />
+                </div>
+              </aside>
+            )}
           </div>
           <QuickAddBatchStickyFooter
             batchSummary={batchSummary}
             actions={
-              <button
-                type="button"
-                onClick={() => canProceed && setShowPreview(true)}
-                disabled={!canProceed}
-                title={!canProceed ? 'Complete employee name, email, DOB, gender, and date of joining' : undefined}
-                className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] ${
-                  canProceed
-                    ? 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
-                    : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
-                }`}
-              >
-                Proceed to submit
-              </button>
+              <>
+                {(premiumFlow === 'fresh' || premiumFlow === 'stale') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (canProceed) setPremiumFlow('calculated')
+                    }}
+                    disabled={!canProceed}
+                    title={
+                      !canProceed
+                        ? 'Complete employee name, email, DOB, gender, date of joining, and coverage effective date for each dependent'
+                        : undefined
+                    }
+                    className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] ${
+                      canProceed
+                        ? 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20'
+                        : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    <Calculator size={18} strokeWidth={2.25} aria-hidden />
+                    {premiumFlow === 'stale' ? 'Recalculate premium' : 'Calculate premium'}
+                  </button>
+                )}
+                {premiumFlow === 'calculated' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (formCdState?.cdAfterSubmit < 0) return
+                      setShowPreview(true)
+                    }}
+                    disabled={formCdState?.cdAfterSubmit < 0}
+                    title={
+                      formCdState?.cdAfterSubmit < 0
+                        ? 'Estimated CD after this change would be negative — adjust cover or recharge CD.'
+                        : undefined
+                    }
+                    className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] ${
+                      formCdState?.cdAfterSubmit < 0
+                        ? 'text-white/90 bg-indigo-400 cursor-not-allowed shadow-none'
+                        : 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
+                    }`}
+                  >
+                    <Eye size={18} strokeWidth={2.25} aria-hidden /> Proceed to submit
+                  </button>
+                )}
+              </>
             }
           />
         </>

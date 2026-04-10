@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, CalendarClock } from 'lucide-react'
+import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, CalendarClock, ChevronRight } from 'lucide-react'
 import EndorsementHistory from '../components/EndorsementHistory'
 import { hrmsJoiningEmployees, hrmsLeavingEmployees } from '../data/mockData'
 
@@ -33,16 +33,6 @@ const actions = [
     borderColor: 'border-rose-100 hover:border-rose-200',
     path: '/delete',
   },
-  {
-    title: 'HRMS Sync',
-    description: 'Sync and approve HRMS changes',
-    icon: RefreshCw,
-    iconBg: 'bg-amber-500',
-    decorBg: 'bg-amber-100',
-    borderColor: 'border-amber-100 hover:border-amber-200',
-    path: '/hrms-sync',
-    badge: pendingHrmsCount,
-  },
 ]
 
 export default function EndorsementsDashboard() {
@@ -53,7 +43,7 @@ export default function EndorsementsDashboard() {
       <div className="mb-5 flex-shrink-0 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Endorsements</h1>
-          <p className="text-sm text-gray-500 mt-1">Manage employee additions, updates, deletions and HRMS syncs</p>
+          <p className="text-sm text-gray-500 mt-1">Run add, update, or delete endorsements. HRMS-driven changes are reviewed separately.</p>
         </div>
         <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 transition-all cursor-pointer flex-shrink-0">
           <CalendarClock size={16} />
@@ -61,7 +51,7 @@ export default function EndorsementsDashboard() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-5 flex-shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3 flex-shrink-0">
         {actions.map((item) => {
           const Icon = item.icon
           return (
@@ -78,15 +68,6 @@ export default function EndorsementsDashboard() {
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${item.iconBg} shadow-sm`}>
                     <Icon size={22} className="text-white" />
                   </div>
-                  {item.badge > 0 && (
-                    <span className="relative flex items-center gap-1.5 px-2.5 py-1 text-xs font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded-full shadow-sm">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-500 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500" />
-                      </span>
-                      {item.badge} pending
-                    </span>
-                  )}
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 mb-0.5">{item.title}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
@@ -99,6 +80,27 @@ export default function EndorsementsDashboard() {
           )
         })}
       </div>
+
+      <button
+        type="button"
+        onClick={() => navigate('/hrms-sync')}
+        className="w-full flex items-center justify-between gap-3 px-4 py-3 mb-5 text-left bg-amber-50/90 border border-amber-200/80 rounded-xl hover:bg-amber-50 hover:border-amber-300 transition-colors cursor-pointer flex-shrink-0"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-lg bg-amber-500 flex items-center justify-center shadow-sm flex-shrink-0">
+            <RefreshCw size={18} className="text-white" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-gray-900">HRMS sync queue</p>
+            <p className="text-xs text-amber-900/80 truncate">
+              {pendingHrmsCount > 0
+                ? `${pendingHrmsCount} joining or leaving employee${pendingHrmsCount !== 1 ? 's' : ''} waiting for review`
+                : 'No pending HRMS changes — open to view history'}
+            </p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-amber-700 flex-shrink-0" />
+      </button>
 
       <div className="flex-1 min-h-0">
         <EndorsementHistory />

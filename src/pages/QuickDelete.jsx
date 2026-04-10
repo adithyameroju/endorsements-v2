@@ -1,21 +1,17 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, CheckCircle, AlertTriangle, ChevronLeft, Trash2, CalendarClock, Check, X, ChevronDown, ChevronUp, Lightbulb } from 'lucide-react'
+import { Search, CheckCircle, AlertTriangle, Trash2, CalendarClock, X, ChevronDown, ChevronUp, Lightbulb, Pencil } from 'lucide-react'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
+import CdBalanceFormWidget from '../components/CdBalanceFormWidget'
+import QuickAddBatchStickyFooter from '../components/QuickAddBatchStickyFooter'
 import { mockEmployees } from '../data/mockData'
 import { useEndorsements } from '../store/EndorsementStore'
+import { computeQuickDeleteCdState } from '../lib/updateFlowPremium'
 
-const STEPS = ['Select Employees', 'Date & Reason', 'Review & Confirm']
+const CD_RAIL_WIDTH_CLASS = 'w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)]'
 
-const leavingReasons = [
-  'Resignation',
-  'Termination',
-  'End of contract',
-  'Retirement',
-  'Mutual separation',
-  'Other',
-]
+const STEPS = ['Select Employees', 'Date of Leaving', 'Review & Confirm']
 
 export default function QuickDelete() {
   const navigate = useNavigate()
@@ -28,10 +24,7 @@ export default function QuickDelete() {
 
   const [globalDate, setGlobalDate] = useState('')
   const [dates, setDates] = useState({})
-  const [globalReason, setGlobalReason] = useState('')
-  const [reasons, setReasons] = useState({})
   const [applyDateAll, setApplyDateAll] = useState(false)
-  const [applyReasonAll, setApplyReasonAll] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState({})
@@ -40,12 +33,47 @@ export default function QuickDelete() {
     if (!query.trim()) return mockEmployees
     const q = query.toLowerCase()
     return mockEmployees.filter(
-      emp => emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.department.toLowerCase().includes(q)
+      emp => emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.email.toLowerCase().includes(q)
     )
   }, [query])
 
   const selectedEmployees = mockEmployees.filter(e => selectedIds.has(e.id))
   const allFilteredSelected = filtered.length > 0 && filtered.every(e => selectedIds.has(e.id))
+
+  const deleteCdState = useMemo(
+    () => computeQuickDeleteCdState(selectedEmployees),
+    [selectedEmployees],
+  )
+
+  const quickDeleteReviewBatchSummary = useMemo(
+    () => ({
+      count: selectedEmployees.length,
+      basicsComplete:
+        selectedEmployees.length > 0 && selectedEmployees.every((e) => dates[e.id])
+          ? selectedEmployees.length
+          : 0,
+      dependentCount: selectedEmployees.reduce((sum, e) => sum + (e.dependents?.length ?? 0), 0),
+    }),
+    [selectedEmployees, dates],
+  )
+
+  const selectionStepBatchSummary = useMemo(
+    () => ({
+      count: selectedIds.size,
+      basicsComplete: selectedIds.size > 0 ? selectedIds.size : 0,
+      dependentCount: selectedEmployees.reduce((sum, e) => sum + (e.dependents?.length ?? 0), 0),
+    }),
+    [selectedIds, selectedEmployees],
+  )
+
+  const datesStepBatchSummary = useMemo(
+    () => ({
+      count: selectedEmployees.length,
+      basicsComplete: selectedEmployees.filter((e) => dates[e.id]).length,
+      dependentCount: selectedEmployees.reduce((sum, e) => sum + (e.dependents?.length ?? 0), 0),
+    }),
+    [selectedEmployees, dates],
+  )
 
   const toggleOne = (id) => {
     setSelectedIds(prev => {
@@ -81,28 +109,39 @@ export default function QuickDelete() {
 
   const goToStep3 = () => {
     const missingDate = selectedEmployees.some(emp => !dates[emp.id])
-    const missingReason = selectedEmployees.some(emp => !reasons[emp.id])
-    if (missingDate || missingReason) {
-      setErrors({
-        ...(missingDate ? { date: 'Please set a date of leaving for every employee' } : {}),
-        ...(missingReason ? { reason: 'Please set a reason for every employee' } : {}),
-      })
+    if (missingDate) {
+      setErrors({ date: 'Please set a date of leaving for every employee' })
       return
     }
     setErrors({})
     setStep(3)
   }
 
+  const allDatesSet =
+    selectedEmployees.length > 0 && selectedEmployees.every((emp) => dates[emp.id])
+
+  const CD_PENDING_STEP1 =
+    'Proceed with the selected employees, then enter dates of leaving in the next step to see CD impact.'
+  const CD_PENDING_STEP2_PARTIAL =
+    'Set a date of leaving for every selected employee to update this estimate.'
+
   const handleSubmit = () => {
     const details = selectedEmployees.map(emp => ({
       name: emp.name,
       id: emp.id,
-      department: emp.department,
-      designation: emp.designation,
-      reason: reasons[emp.id],
       dateOfLeaving: dates[emp.id],
     }))
-    addEntry({ action: 'Delete Employee', count: selectedEmployees.length, status: 'Success', type: 'quick', details })
+    addEntry({
+      action: 'Delete Employee',
+      count: selectedEmployees.length,
+      status: 'Success',
+      type: 'quick',
+      details,
+      changeSummary: {
+        title: 'Employees removed from policy',
+        lines: selectedEmployees.map((emp) => `${emp.name} (${emp.id})`),
+      },
+    })
     setSubmitted(true)
     setTimeout(() => navigate('/'), 2000)
   }
@@ -122,250 +161,251 @@ export default function QuickDelete() {
   /* ─── STEP 3: REVIEW & CONFIRM ─── */
   if (step === 3) {
     return (
-      <div className="flex flex-col h-full px-6 lg:px-8 py-6">
-        <div className="flex-shrink-0">
-          <PageHeader
-            title="Quick Delete"
-            subtitle="Review all details before confirming"
-            breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
-            trailing={<Stepper steps={STEPS} currentStep={3} compact />}
-          />
-        </div>
+      <div className="h-full flex flex-col min-h-0 px-6 lg:px-8 pt-4 pb-0">
+        <PageHeader
+          title="Quick Delete"
+          subtitle="Review all details before confirming"
+          breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
+          trailing={<Stepper steps={STEPS} currentStep={3} compact />}
+          onBack={() => { setStep(2); setErrors({}) }}
+          backLabel="Back"
+        />
 
-        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-          <button onClick={() => { setStep(2); setErrors({}) }} className="mb-5 inline-flex items-center gap-1.5 text-sm text-indigo-600 font-medium hover:text-indigo-700 cursor-pointer">
-            <ChevronLeft size={16} /> Back to Date & Reason
-          </button>
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col order-1 lg:min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[420px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date of Leaving</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedEmployees.map(emp => (
+                        <tr key={emp.id} className="hover:bg-gray-50/50">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{emp.id}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{formatDate(dates[emp.id])}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
 
-          {/* Summary table (read-only) */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-5">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[780px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Reason</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date of Leaving</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedEmployees.map(emp => (
-                    <tr key={emp.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{emp.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.id}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.department}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{reasons[emp.id]}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{formatDate(dates[emp.id])}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          {/* Confirmation */}
-          <div className="p-4 bg-red-50 border border-red-200 rounded-xl mb-5">
-            <div className="flex items-start gap-3">
-              <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-red-900">Confirm Deletion</p>
-                <p className="text-xs text-red-700 mt-0.5 leading-relaxed">
-                  This will remove {selectedEmployees.length} employee{selectedEmployees.length > 1 ? 's' : ''} and all associated dependents from the group policy. This cannot be undone.
-                </p>
-                <label className="flex items-center gap-2 mt-3 cursor-pointer">
-                  <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="accent-red-600 w-4 h-4" />
-                  <span className="text-sm text-red-800">I confirm this deletion</span>
-                </label>
+              <div className="p-4 bg-red-50 border border-red-200 rounded-xl">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle size={20} className="text-red-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-red-900">Confirm Deletion</p>
+                    <p className="text-xs text-red-700 mt-0.5 leading-relaxed">
+                      This will remove {selectedEmployees.length} employee{selectedEmployees.length > 1 ? 's' : ''} and all associated dependents from the group policy. This cannot be undone.
+                    </p>
+                    <label className="flex items-center gap-2 mt-3 cursor-pointer">
+                      <input type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} className="accent-red-600 w-4 h-4" />
+                      <span className="text-sm text-red-800">I confirm this deletion</span>
+                    </label>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setStep(2)} className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Back</button>
-            <button
-              disabled={!confirmed}
-              onClick={handleSubmit}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2 cursor-pointer"
-            >
-              <Trash2 size={15} /> Delete {selectedEmployees.length} Employee{selectedEmployees.length > 1 ? 's' : ''}
-            </button>
-          </div>
+          <aside className={`${CD_RAIL_WIDTH_CLASS} shrink-0 order-2 lg:min-h-0 flex flex-col lg:justify-start`} aria-label="CD balance estimate">
+            <div className="w-full lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+              <CdBalanceFormWidget
+                cdAfterSubmit={deleteCdState.cdAfterSubmit}
+                currentCd={deleteCdState.currentCd}
+                estimatedCdDraw={deleteCdState.estimatedCdDraw}
+                lines={deleteCdState.cdBreakdownLines}
+                primaryBatchCount={selectedEmployees.length}
+                estimateReady
+                creditMode
+              />
+            </div>
+          </aside>
         </div>
+
+        <QuickAddBatchStickyFooter
+          batchSummary={quickDeleteReviewBatchSummary}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => { setStep(2); setErrors({}) }}
+                className="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-2 sm:order-2"
+              >
+                <Pencil size={18} strokeWidth={2.25} aria-hidden /> Back
+              </button>
+              <button
+                type="button"
+                disabled={!confirmed}
+                onClick={handleSubmit}
+                className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-red-600 rounded-xl hover:bg-red-700 shadow-md shadow-red-600/15 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-1 sm:order-3"
+              >
+                <Trash2 size={18} strokeWidth={2.25} aria-hidden /> Delete {selectedEmployees.length} Employee{selectedEmployees.length > 1 ? 's' : ''}
+              </button>
+            </>
+          }
+        />
       </div>
     )
   }
 
-  /* ─── STEP 2: DATE & REASON ─── */
+  /* ─── STEP 2: DATE OF LEAVING ─── */
   if (step === 2) {
     return (
-      <div className="flex flex-col h-full px-6 lg:px-8 py-6">
+      <div className="h-full flex flex-col min-h-0 px-6 lg:px-8 pt-4 pb-0">
         <div className="flex-shrink-0">
           <PageHeader
             title="Quick Delete"
-            subtitle={`Assign date of leaving and reason for ${selectedEmployees.length} employee${selectedEmployees.length > 1 ? 's' : ''}`}
+            subtitle={`Assign date of leaving for ${selectedEmployees.length} employee${selectedEmployees.length > 1 ? 's' : ''}`}
             breadcrumbs={[{ label: 'Delete Employee', path: '/delete' }, { label: 'Quick Delete' }]}
             trailing={<Stepper steps={STEPS} currentStep={2} compact />}
+            onBack={() => { setStep(1); setErrors({}) }}
+            backLabel="Back"
           />
         </div>
 
-        <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-          <button onClick={() => { setStep(1); setErrors({}) }} className="mb-5 inline-flex items-center gap-1.5 text-sm text-indigo-600 font-medium hover:text-indigo-700 cursor-pointer">
-            <ChevronLeft size={16} /> Back to selection
-          </button>
+        <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col order-1 lg:min-h-0">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-2">
+              {errors.date && (
+                <div className="mb-3">
+                  <p className="text-xs text-red-500">{errors.date}</p>
+                </div>
+              )}
 
-          {(errors.date || errors.reason) && (
-            <div className="flex flex-wrap gap-3 mb-3">
-              {errors.date && <p className="text-xs text-red-500">{errors.date}</p>}
-              {errors.reason && <p className="text-xs text-red-500">{errors.reason}</p>}
-            </div>
-          )}
-
-          {/* Editable table with Excel-style global apply checkboxes in header */}
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-5">
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px]">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-200">
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">Employee</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[10%]">ID</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[15%]">Department</th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={applyReasonAll}
-                          onChange={e => {
-                            setApplyReasonAll(e.target.checked)
-                            if (e.target.checked && globalReason) {
-                              const applied = { ...reasons }
-                              selectedEmployees.forEach(emp => { applied[emp.id] = globalReason })
-                              setReasons(applied)
-                              setErrors(prev => ({ ...prev, reason: undefined }))
-                            }
-                          }}
-                          className="accent-indigo-600 w-3.5 h-3.5 cursor-pointer"
-                          title="Apply reason to all rows"
-                        />
-                        <span>Reason <span className="text-red-400">*</span></span>
-                      </div>
-                    </th>
-                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[20%]">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={applyDateAll}
-                          onChange={e => {
-                            setApplyDateAll(e.target.checked)
-                            if (e.target.checked && globalDate) {
-                              const applied = { ...dates }
-                              selectedEmployees.forEach(emp => { applied[emp.id] = globalDate })
-                              setDates(applied)
-                              setErrors(prev => ({ ...prev, date: undefined }))
-                            }
-                          }}
-                          className="accent-indigo-600 w-3.5 h-3.5 cursor-pointer"
-                          title="Apply date to all rows"
-                        />
-                        <span>Date of Leaving <span className="text-red-400">*</span></span>
-                      </div>
-                    </th>
-                  </tr>
-                  {/* Global apply row when header checkbox is checked */}
-                  {(applyReasonAll || applyDateAll) && (
-                    <tr className="bg-indigo-50/60 border-b border-indigo-200">
-                      <td colSpan={3} className="px-4 py-2">
-                        <span className="text-xs font-semibold text-indigo-700 inline-flex items-center gap-1.5">
-                          <CalendarClock size={13} /> Apply to all {selectedEmployees.length} employees
-                        </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        {applyReasonAll && (
-                          <select
-                            value={globalReason}
-                            onChange={e => {
-                              setGlobalReason(e.target.value)
-                              if (e.target.value) {
-                                const applied = { ...reasons }
-                                selectedEmployees.forEach(emp => { applied[emp.id] = e.target.value })
-                                setReasons(applied)
-                                setErrors(prev => ({ ...prev, reason: undefined }))
-                              }
-                            }}
-                            className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-lg bg-white font-medium text-indigo-900"
-                          >
-                            <option value="">Select reason for all</option>
-                            {leavingReasons.map(r => <option key={r} value={r}>{r}</option>)}
-                          </select>
-                        )}
-                      </td>
-                      <td className="px-4 py-2">
-                        {applyDateAll && (
-                          <input
-                            type="date"
-                            value={globalDate}
-                            onChange={e => {
-                              setGlobalDate(e.target.value)
-                              if (e.target.value) {
-                                const applied = { ...dates }
-                                selectedEmployees.forEach(emp => { applied[emp.id] = e.target.value })
-                                setDates(applied)
-                                setErrors(prev => ({ ...prev, date: undefined }))
-                              }
-                            }}
-                            className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-lg bg-white font-medium text-indigo-900"
-                          />
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {selectedEmployees.map(emp => (
-                    <tr key={emp.id} className="hover:bg-gray-50/50">
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">{emp.name}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.id}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.department}</td>
-                      <td className="px-4 py-2">
-                        <select
-                          value={reasons[emp.id] || ''}
-                          onChange={e => { setReasons(prev => ({ ...prev, [emp.id]: e.target.value })); setErrors(prev => ({ ...prev, reason: undefined })) }}
-                          className={`w-full px-2.5 py-1.5 text-sm border rounded-lg bg-white transition-colors ${!reasons[emp.id] && errors.reason ? 'border-red-300 bg-red-50/30' : 'border-gray-200 hover:border-gray-300 focus:border-indigo-400'}`}
-                        >
-                          <option value="">Select</option>
-                          {leavingReasons.map(r => <option key={r} value={r}>{r}</option>)}
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="date"
-                          value={dates[emp.id] || ''}
-                          onChange={e => { setDates(prev => ({ ...prev, [emp.id]: e.target.value })); setErrors(prev => ({ ...prev, date: undefined })) }}
-                          className={`w-full px-2.5 py-1.5 text-sm border rounded-lg bg-white transition-colors ${!dates[emp.id] && errors.date ? 'border-red-300 bg-red-50/30' : 'border-gray-200 hover:border-gray-300 focus:border-indigo-400'}`}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[480px]">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[32%]">Employee</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[18%]">ID</th>
+                        <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-[50%]">
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={applyDateAll}
+                              onChange={e => {
+                                setApplyDateAll(e.target.checked)
+                                if (e.target.checked && globalDate) {
+                                  const applied = { ...dates }
+                                  selectedEmployees.forEach(emp => { applied[emp.id] = globalDate })
+                                  setDates(applied)
+                                  setErrors(prev => ({ ...prev, date: undefined }))
+                                }
+                              }}
+                              className="accent-indigo-600 w-3.5 h-3.5 cursor-pointer"
+                              title="Apply date to all rows"
+                            />
+                            <span>Date of Leaving <span className="text-red-400">*</span></span>
+                          </div>
+                        </th>
+                      </tr>
+                      {applyDateAll && (
+                        <tr className="bg-indigo-50/60 border-b border-indigo-200">
+                          <td colSpan={2} className="px-4 py-2">
+                            <span className="text-xs font-semibold text-indigo-700 inline-flex items-center gap-1.5">
+                              <CalendarClock size={13} /> Apply to all {selectedEmployees.length} employees
+                            </span>
+                          </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="date"
+                              value={globalDate}
+                              onChange={e => {
+                                setGlobalDate(e.target.value)
+                                if (e.target.value) {
+                                  const applied = { ...dates }
+                                  selectedEmployees.forEach(emp => { applied[emp.id] = e.target.value })
+                                  setDates(applied)
+                                  setErrors(prev => ({ ...prev, date: undefined }))
+                                }
+                              }}
+                              className="w-full px-2.5 py-1.5 text-sm border border-indigo-300 rounded-lg bg-white font-medium text-indigo-900"
+                            />
+                          </td>
+                        </tr>
+                      )}
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {selectedEmployees.map(emp => (
+                        <tr key={emp.id} className="hover:bg-gray-50/50">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">{emp.name}</td>
+                          <td className="px-4 py-3 text-sm text-gray-600">{emp.id}</td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="date"
+                              value={dates[emp.id] || ''}
+                              onChange={e => { setDates(prev => ({ ...prev, [emp.id]: e.target.value })); setErrors(prev => ({ ...prev, date: undefined })) }}
+                              className={`w-full px-2.5 py-1.5 text-sm border rounded-lg bg-white transition-colors ${!dates[emp.id] && errors.date ? 'border-red-300 bg-red-50/30' : 'border-gray-200 hover:border-gray-300 focus:border-indigo-400'}`}
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
 
-          <div className="flex justify-end gap-3">
-            <button onClick={() => setStep(1)} className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Back</button>
-            <button onClick={goToStep3} className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 inline-flex items-center gap-2 cursor-pointer">
-              Review & Confirm
-            </button>
-          </div>
+          <aside className={`${CD_RAIL_WIDTH_CLASS} shrink-0 order-2 lg:min-h-0 flex flex-col lg:justify-start`} aria-label="CD balance estimate">
+            <div className="w-full lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+              <CdBalanceFormWidget
+                cdAfterSubmit={deleteCdState.cdAfterSubmit}
+                currentCd={deleteCdState.currentCd}
+                estimatedCdDraw={deleteCdState.estimatedCdDraw}
+                lines={deleteCdState.cdBreakdownLines}
+                primaryBatchCount={selectedEmployees.length}
+                estimateReady={allDatesSet}
+                estimatePendingHint={!allDatesSet ? CD_PENDING_STEP2_PARTIAL : undefined}
+                creditMode
+              />
+            </div>
+          </aside>
         </div>
+
+        <QuickAddBatchStickyFooter
+          batchSummary={datesStepBatchSummary}
+          actions={
+            <>
+              <button
+                type="button"
+                onClick={() => { setStep(1); setErrors({}) }}
+                className="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-2 sm:order-2"
+              >
+                <Pencil size={18} strokeWidth={2.25} aria-hidden /> Back
+              </button>
+              <button
+                type="button"
+                onClick={goToStep3}
+                disabled={!allDatesSet}
+                title={!allDatesSet ? 'Set date of leaving for every employee first' : undefined}
+                className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-1 sm:order-3 ${
+                  allDatesSet
+                    ? 'text-white bg-red-600 hover:bg-red-700 shadow-md shadow-red-600/15'
+                    : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
+                }`}
+              >
+                Review &amp; Confirm
+              </button>
+            </>
+          }
+        />
       </div>
     )
   }
 
   /* ─── STEP 1: SELECT EMPLOYEES ─── */
   return (
-    <div className="flex flex-col h-full px-6 lg:px-8 py-6">
+    <div className="h-full flex flex-col min-h-0 px-6 lg:px-8 pt-4 pb-0">
       <div className="flex-shrink-0">
         <PageHeader
           title="Quick Delete"
@@ -375,22 +415,24 @@ export default function QuickDelete() {
         />
       </div>
 
-      <div className="flex-1 min-h-0 overflow-y-auto pb-4">
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col order-1 lg:min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain pb-2">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
           <div className="relative flex-1 min-w-[240px]">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             <input
               type="text" value={query} onChange={e => setQuery(e.target.value)}
-              placeholder="Filter by name, ID, or department..."
+              placeholder="Filter by name, ID, or email..."
               className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white"
             />
           </div>
-          {selectedIds.size > 0 && (
-            <span className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
-              {selectedIds.size} selected
-            </span>
-          )}
-        </div>
+            {selectedIds.size > 0 && (
+              <span className="text-sm font-medium text-indigo-600 bg-indigo-50 px-3 py-1.5 rounded-full">
+                {selectedIds.size} selected
+              </span>
+            )}
+          </div>
 
         {/* Selected employees — directly under search */}
         <div className="bg-white border border-indigo-200 rounded-xl overflow-hidden mb-4">
@@ -433,11 +475,15 @@ export default function QuickDelete() {
           </p>
         </div>
 
-        {errors.selection && <p className="text-xs text-red-500 mb-3">{errors.selection}</p>}
+        {errors.selection && (
+          <div className="mb-3">
+            <p className="text-xs text-red-500">{errors.selection}</p>
+          </div>
+        )}
 
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-4">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[650px]">
+            <table className="w-full min-w-[520px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
                   <th className="w-12 px-4 py-2.5">
@@ -445,8 +491,6 @@ export default function QuickDelete() {
                   </th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee</th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">ID</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Department</th>
-                  <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Designation</th>
                   <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Date of Joining</th>
                 </tr>
               </thead>
@@ -460,30 +504,64 @@ export default function QuickDelete() {
                       </td>
                       <td className="px-4 py-3"><p className="text-sm font-medium text-gray-900">{emp.name}</p><p className="text-xs text-gray-500">{emp.email}</p></td>
                       <td className="px-4 py-3 text-sm text-gray-600">{emp.id}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.department}</td>
-                      <td className="px-4 py-3 text-sm text-gray-600">{emp.designation}</td>
                       <td className="px-4 py-3 text-sm text-gray-600">{formatDate(emp.doj)}</td>
                     </tr>
                   )
                 })}
                 {filtered.length === 0 && (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">No employees match your search</td></tr>
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-sm text-gray-400">No employees match your search</td></tr>
                 )}
               </tbody>
             </table>
           </div>
         </div>
+        </div>
+        </div>
+
+        <aside className={`${CD_RAIL_WIDTH_CLASS} shrink-0 order-2 lg:min-h-0 flex flex-col lg:justify-start`} aria-label="CD balance estimate">
+          <div className="w-full lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+            <CdBalanceFormWidget
+              cdAfterSubmit={deleteCdState.cdAfterSubmit}
+              currentCd={deleteCdState.currentCd}
+              estimatedCdDraw={deleteCdState.estimatedCdDraw}
+              lines={deleteCdState.cdBreakdownLines}
+              primaryBatchCount={selectedEmployees.length}
+              estimateReady={false}
+              estimatePendingHint={CD_PENDING_STEP1}
+              creditMode
+            />
+          </div>
+        </aside>
       </div>
 
-      <div className="flex-shrink-0 bg-white border-t border-gray-200 -mx-6 lg:-mx-8 px-6 lg:px-8 py-3.5 flex items-center justify-between">
-        <span className="text-sm text-gray-500">{selectedIds.size > 0 ? `${selectedIds.size} employee${selectedIds.size > 1 ? 's' : ''} selected` : 'No employees selected'}</span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/delete')} className="px-4 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 cursor-pointer">Cancel</button>
-          <button onClick={goToStep2} className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 inline-flex items-center gap-2 cursor-pointer">
-            Next: Date & Reason
-          </button>
-        </div>
-      </div>
+      <QuickAddBatchStickyFooter
+        batchSummary={selectionStepBatchSummary}
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => navigate('/delete')}
+              className="w-full sm:w-auto px-5 py-3.5 text-sm font-semibold text-gray-800 bg-white border-2 border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-2 sm:order-2"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={goToStep2}
+              disabled={selectedIds.size === 0}
+              title={selectedIds.size === 0 ? 'Select at least one employee' : undefined}
+              className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-1 sm:order-3 ${
+                selectedIds.size > 0
+                  ? 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20'
+                  : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
+              }`}
+            >
+              <CalendarClock size={18} strokeWidth={2.25} aria-hidden />
+              Proceed to select dates
+            </button>
+          </>
+        }
+      />
     </div>
   )
 }

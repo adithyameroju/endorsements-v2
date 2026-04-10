@@ -20,6 +20,8 @@ export default function QuickAddReviewScreen({
   cdAfterSubmit,
   currentCd,
   draftBanner = '',
+  cdSubmitBlocked = false,
+  onRechargeDemo,
 }) {
   return (
     <div
@@ -49,12 +51,23 @@ export default function QuickAddReviewScreen({
         </div>
       )}
 
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2 order-1">
-          <ReviewEmployeesPanel employees={employees} />
+      {cdSubmitBlocked && (
+        <div
+          className="mb-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-medium text-red-950"
+          role="alert"
+        >
+          Submit is disabled: estimated CD after this batch is negative. Go back, recharge CD, or remove employees / dependents.
         </div>
-        <aside className="w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)] shrink-0 lg:min-h-0 flex flex-col order-2">
-          <div className="lg:sticky lg:top-4 lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+      )}
+
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col order-1 lg:min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2">
+            <ReviewEmployeesPanel employees={employees} />
+          </div>
+        </div>
+        <aside className="w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)] shrink-0 order-2 lg:min-h-0 flex flex-col lg:justify-start">
+          <div className="w-full lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
             <CdBalanceFormWidget
               cdAfterSubmit={cdAfterSubmit}
               currentCd={currentCd}
@@ -62,6 +75,9 @@ export default function QuickAddReviewScreen({
               lines={cdBreakdownLines}
               primaryBatchCount={employees.length}
               estimateReady
+              {...(typeof onRechargeDemo === 'function'
+                ? { rechargeCtaLabel: 'Recharge CD (demo)', onRechargeClick: onRechargeDemo }
+                : {})}
             />
           </div>
         </aside>
@@ -91,7 +107,17 @@ export default function QuickAddReviewScreen({
             <button
               type="button"
               onClick={onSubmit}
-              className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] order-1 sm:order-3"
+              disabled={cdSubmitBlocked}
+              title={
+                cdSubmitBlocked
+                  ? 'CD balance is not sufficient for this batch (est.) — go back and recharge or reduce the batch.'
+                  : undefined
+              }
+              className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] order-1 sm:order-3 ${
+                cdSubmitBlocked
+                  ? 'text-white/90 bg-indigo-400 cursor-not-allowed shadow-none'
+                  : 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
+              }`}
             >
               <CheckCircle size={18} strokeWidth={2.25} aria-hidden /> Submit Endorsement
             </button>

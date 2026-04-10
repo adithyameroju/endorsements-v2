@@ -11,6 +11,17 @@ export default function PlanSelection({
   hideGmcToggle = false,
   /** Dependent GMC: single row of controls to save vertical space */
   horizontalGmcLayout = false,
+  /** Hide whole GMC block (e.g. not part of failed endorsement scope) */
+  showGmcBlock = true,
+  /** Hide whole GPA block */
+  showGpaBlock = true,
+  /** Prevent turning GMC off once on (endorsement correction — cannot drop cover type) */
+  disableGmcToggleOff = false,
+  disableGpaToggleOff = false,
+  /** Hide optional GMC sections that were not in the original endorsement */
+  allowGmcTopup = true,
+  allowGmcAddons = true,
+  allowGmcSecondary = true,
 }) {
   const updatePlans = (key, value) => {
     onChange({ ...plans, [key]: value })
@@ -22,6 +33,7 @@ export default function PlanSelection({
   const showGmcConfigure = hideGmcToggle || gmcEnabled
 
   const toggleGMC = (enabled) => {
+    if (!enabled && disableGmcToggleOff && gmcEnabled) return
     if (enabled) {
       updatePlans('gmcBasePlan', basePlans[0].id)
     } else {
@@ -43,6 +55,7 @@ export default function PlanSelection({
         gpaSiType: 'fixed',
       })
     } else {
+      if (disableGpaToggleOff && gpaEnabled) return
       const newPlans = { ...plans }
       delete newPlans.gpaBasePlan
       delete newPlans.gpaSiType
@@ -62,8 +75,17 @@ export default function PlanSelection({
         </div>
       )}
 
-      <div className={gmcOnly ? '' : 'grid grid-cols-1 lg:grid-cols-2 gap-6'}>
+      <div
+        className={
+          gmcOnly
+            ? ''
+            : showGmcBlock && showGpaBlock
+              ? 'grid grid-cols-1 lg:grid-cols-2 gap-6'
+              : 'grid grid-cols-1 gap-6'
+        }
+      >
         {/* GMC Section - Combined Container */}
+        {showGmcBlock && (
         <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
           {/* GMC header: toggle (employees) or static title (dependents custom GMC) */}
           {hideGmcToggle ? (
@@ -87,14 +109,15 @@ export default function PlanSelection({
                   <p className="text-xs text-gray-500 leading-snug">Comprehensive medical insurance for hospitalization, OPD & more</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className={`relative inline-flex items-center ${disableGmcToggleOff && gmcEnabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}>
                 <input
                   type="checkbox"
                   checked={gmcEnabled}
+                  disabled={disableGmcToggleOff && gmcEnabled}
                   onChange={e => toggleGMC(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 peer-disabled:opacity-60"></div>
               </label>
             </div>
           )}
@@ -121,6 +144,7 @@ export default function PlanSelection({
                       ))}
                     </select>
                   </div>
+                  {allowGmcSecondary && (
                   <div className="min-w-0 w-full">
                     <OptionalPlanInline
                       label="Secondary"
@@ -140,6 +164,8 @@ export default function PlanSelection({
                       </select>
                     </OptionalPlanInline>
                   </div>
+                  )}
+                  {allowGmcTopup && (
                   <div className="min-w-0 w-full">
                     <OptionalPlanInline
                       label="Top-up"
@@ -159,6 +185,8 @@ export default function PlanSelection({
                       </select>
                     </OptionalPlanInline>
                   </div>
+                  )}
+                  {allowGmcAddons && (
                   <div className="min-w-0 w-full xl:col-span-1">
                     <OptionalPlanInline
                       label="Add-ons"
@@ -190,6 +218,7 @@ export default function PlanSelection({
                       </div>
                     </OptionalPlanInline>
                   </div>
+                  )}
                 </div>
               ) : (
                 <>
@@ -212,6 +241,7 @@ export default function PlanSelection({
                   </div>
 
                   <div className="space-y-2">
+                    {allowGmcTopup && (
                     <OptionalPlan
                       label="Top-up Plan"
                       active={plans.gmcTopup && plans.gmcTopup !== 'none'}
@@ -229,7 +259,9 @@ export default function PlanSelection({
                         ))}
                       </select>
                     </OptionalPlan>
+                    )}
 
+                    {allowGmcAddons && (
                     <OptionalPlan
                       label="Add-on Plan"
                       active={(plans.gmcAddons || []).length > 0}
@@ -259,7 +291,9 @@ export default function PlanSelection({
                         })}
                       </div>
                     </OptionalPlan>
+                    )}
 
+                    {allowGmcSecondary && (
                     <OptionalPlan
                       label="Secondary Plan"
                       active={plans.gmcSecondaryPlan && plans.gmcSecondaryPlan !== 'none'}
@@ -277,15 +311,17 @@ export default function PlanSelection({
                         ))}
                       </select>
                     </OptionalPlan>
+                    )}
                   </div>
                 </>
               )}
             </div>
           )}
         </div>
+        )}
 
       {/* GPA Section - Combined Container - hidden when gmcOnly (e.g. dependents) */}
-      {!gmcOnly && (
+      {!gmcOnly && showGpaBlock && (
         <div className="border border-gray-200 rounded-xl bg-white overflow-hidden">
           {/* GPA Toggle Header */}
           <div className="flex items-center justify-between p-4">
@@ -298,14 +334,15 @@ export default function PlanSelection({
                 <p className="text-xs text-gray-500 leading-snug">Accidental death and disability coverage</p>
               </div>
             </div>
-            <label className="relative inline-flex items-center cursor-pointer">
+            <label className={`relative inline-flex items-center ${disableGpaToggleOff && gpaEnabled ? 'cursor-not-allowed opacity-70' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 checked={gpaEnabled}
+                disabled={disableGpaToggleOff && gpaEnabled}
                 onChange={e => toggleGPA(e.target.checked)}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600 peer-disabled:opacity-60"></div>
             </label>
           </div>
 

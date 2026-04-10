@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Search, User, CheckCircle, Sparkles } from 'lucide-react'
+import { Search, User, CheckCircle, Sparkles, Calculator, Eye } from 'lucide-react'
+import CdBalanceFormWidget from '../components/CdBalanceFormWidget'
 import PageHeader from '../components/PageHeader'
 import Stepper from '../components/Stepper'
 import PlanSelection from '../components/PlanSelection'
@@ -22,8 +23,15 @@ import {
   mergeDemoEmployeePlans,
   buildSpouseFlowPremiumEmployees,
   buildLifeEventCdBaselineEmployee,
+  computeUpdateFlowCdState,
 } from '../lib/updateFlowPremium'
 import { spouseFlowBatchSummary } from '../lib/updateFlowBatchSummary'
+
+const CD_RAIL_WIDTH_CLASS = 'w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)]'
+
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export default function LifeEventSpouse() {
   const navigate = useNavigate()
@@ -36,6 +44,7 @@ export default function LifeEventSpouse() {
     dob: '',
     gender: 'Female',
     dateOfMarriage: '',
+    coverageEffectiveDate: '',
     samePlansAsEmployee: true,
     plans: {},
   })
@@ -43,6 +52,8 @@ export default function LifeEventSpouse() {
   const [submitted, setSubmitted] = useState(false)
   const [errors, setErrors] = useState({})
   const [employeePlansEdit, setEmployeePlansEdit] = useState(null)
+  const [premiumFlow, setPremiumFlow] = useState('fresh')
+  const isFirstSpouseEffect = useRef(true)
 
   const batchSummary = useMemo(
     () => spouseFlowBatchSummary(selectedEmployee, spouseData),
@@ -64,6 +75,31 @@ export default function LifeEventSpouse() {
     return [buildLifeEventCdBaselineEmployee(selectedEmployee)]
   }, [showPreview, selectedEmployee])
 
+  const formCdState = useMemo(() => {
+    if (!selectedEmployee || !employeePlansEdit) return null
+    const employees = buildSpouseFlowPremiumEmployees(
+      selectedEmployee,
+      spouseData,
+      employeePlansEdit,
+    )
+    const baseline = [buildLifeEventCdBaselineEmployee(selectedEmployee)]
+    return computeUpdateFlowCdState(employees, {
+      flow: 'add-spouse',
+      flowMeta: { spouseName: spouseData.name },
+      baselineEmployees: baseline,
+    })
+  }, [selectedEmployee, spouseData, employeePlansEdit])
+
+  useEffect(() => {
+    if (isFirstSpouseEffect.current) {
+      isFirstSpouseEffect.current = false
+      return
+    }
+    setPremiumFlow((f) => (f === 'calculated' ? 'stale' : f))
+  }, [spouseData, employeePlansEdit])
+
+  const cdEstimateReadyForm = premiumFlow === 'calculated'
+
   const filteredEmployees = mockEmployees.filter(emp =>
     emp.name.toLowerCase().includes(query.toLowerCase()) || emp.id.toLowerCase().includes(query.toLowerCase())
   )
@@ -73,6 +109,8 @@ export default function LifeEventSpouse() {
     setEmployeePlansEdit(mergeDemoEmployeePlans(emp))
     setShowResults(false)
     setShowPreview(false)
+    setPremiumFlow('fresh')
+    isFirstSpouseEffect.current = true
     setQuery(emp.name)
   }
 
@@ -92,6 +130,7 @@ export default function LifeEventSpouse() {
       dob: '1994-06-12',
       gender: 'Female',
       dateOfMarriage: '2025-01-15',
+      coverageEffectiveDate: todayIsoDate(),
       samePlansAsEmployee: true,
       plans: {},
     })
@@ -102,18 +141,37 @@ export default function LifeEventSpouse() {
     if (!spouseData.name.trim()) e.name = 'Spouse name is required'
     if (!spouseData.dob) e.dob = 'Date of birth is required'
     if (!spouseData.dateOfMarriage) e.dateOfMarriage = 'Date of marriage is required'
+    if (!String(spouseData.coverageEffectiveDate || '').trim()) {
+      e.coverageEffectiveDate = 'Coverage effective date is required'
+    }
     setErrors(e)
     return Object.keys(e).length === 0
   }
 
   const handleProceedToSubmit = () => {
     if (!validate()) return
+    if (formCdState?.cdAfterSubmit < 0) return
     setShowPreview(true)
   }
 
   const handleSubmit = () => {
     if (!validate()) return
-    addEntry({ action: 'Life Event - Add Spouse', count: 1, status: 'Success', type: 'quick' })
+    addEntry({
+      action: 'Life Event - Add Spouse',
+      count: 1,
+      status: 'Success',
+      type: 'quick',
+      changeSummary: { title: 'Spouse added to cover', lines: ['Spouse enrolled under employee record'] },
+      premiumSummary: {
+        totalInclGst: 22160,
+        gstRatePercent: 18,
+        lines: [
+          { label: 'GMC dependent (mock)', amount: 14000 },
+          { label: 'GST (18%)', amount: 8160 },
+          { label: 'Total (incl. GST)', amount: 22160 },
+        ],
+      },
+    })
     setSubmitted(true)
     setTimeout(() => navigate('/'), 2000)
   }
@@ -152,6 +210,7 @@ export default function LifeEventSpouse() {
         cdFlow="add-spouse"
         cdFlowMeta={{ spouseName: spouseData.name }}
         cdBaselineEmployees={reviewCdBaseline}
+        cdEstimateReady
       />
     )
   }
@@ -210,7 +269,7 @@ export default function LifeEventSpouse() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900">{emp.name}</p>
-                      <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.department}</p>
+                      <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.email}</p>
                     </div>
                   </button>
                 ))
@@ -222,8 +281,8 @@ export default function LifeEventSpouse() {
 
       {selectedEmployee && employeePlansEdit && (
         <>
-          <div className="flex-1 min-h-0 flex flex-col min-h-0">
-            <div className="flex-1 min-h-0 rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col lg:self-stretch rounded-xl border border-gray-200 bg-white shadow-sm ring-1 ring-black/[0.04] overflow-hidden">
               <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-6 space-y-4">
                 <section className={updateFormSectionShell.basic}>
                   <div className="flex items-center justify-between mb-4">
@@ -238,7 +297,7 @@ export default function LifeEventSpouse() {
                     </div>
                     <div>
                       <p className="text-sm font-semibold text-gray-900">{selectedEmployee.name}</p>
-                      <p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.department}</p>
+                      <p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.email}</p>
                     </div>
                   </div>
                 </section>
@@ -265,7 +324,7 @@ export default function LifeEventSpouse() {
                       Spouse details
                     </h3>
                   </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-5 gap-y-4">
                   <div>
                     <label className={formFieldLabelClass}>Spouse Name <span className="text-red-500">*</span></label>
                     <input
@@ -308,6 +367,20 @@ export default function LifeEventSpouse() {
                       <option>Female</option>
                       <option>Other</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className={formFieldLabelClass}>
+                      Coverage effective date <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={spouseData.coverageEffectiveDate}
+                      onChange={e => setSpouseData({ ...spouseData, coverageEffectiveDate: e.target.value })}
+                      className={`${formControlClass} ${errors.coverageEffectiveDate ? formControlErrorClass : ''}`}
+                    />
+                    {errors.coverageEffectiveDate && (
+                      <p className="text-xs text-red-500 mt-1">{errors.coverageEffectiveDate}</p>
+                    )}
                   </div>
                 </div>
                 </section>
@@ -354,23 +427,70 @@ export default function LifeEventSpouse() {
                 </section>
               </div>
             </div>
+            {formCdState && (
+              <aside
+                className={`${CD_RAIL_WIDTH_CLASS} shrink-0 lg:min-h-0 flex flex-col lg:self-stretch`}
+                aria-label="CD balance estimate"
+              >
+                <div className="flex flex-col flex-1 min-h-0 lg:sticky lg:top-4 lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+                  <CdBalanceFormWidget
+                    cdAfterSubmit={formCdState.cdAfterSubmit}
+                    currentCd={formCdState.currentCd}
+                    estimatedCdDraw={formCdState.estimatedCdDraw}
+                    lines={formCdState.cdBreakdownLines}
+                    primaryBatchCount={1}
+                    estimateReady={cdEstimateReadyForm}
+                  />
+                </div>
+              </aside>
+            )}
           </div>
           <QuickAddBatchStickyFooter
             batchSummary={batchSummary}
             actions={
-              <button
-                type="button"
-                onClick={handleProceedToSubmit}
-                disabled={!canProceed}
-                title={!canProceed ? 'Enter spouse name, date of birth, and date of marriage' : undefined}
-                className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] ${
-                  canProceed
-                    ? 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
-                    : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
-                }`}
-              >
-                Proceed to submit
-              </button>
+              <>
+                {(premiumFlow === 'fresh' || premiumFlow === 'stale') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (canProceed) setPremiumFlow('calculated')
+                    }}
+                    disabled={!canProceed}
+                    title={
+                      !canProceed
+                        ? 'Enter spouse details, date of marriage, and coverage effective date'
+                        : undefined
+                    }
+                    className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem] ${
+                      canProceed
+                        ? 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20'
+                        : 'text-gray-400 bg-gray-200 cursor-not-allowed shadow-none'
+                    }`}
+                  >
+                    <Calculator size={18} strokeWidth={2.25} aria-hidden />
+                    {premiumFlow === 'stale' ? 'Recalculate premium' : 'Calculate premium'}
+                  </button>
+                )}
+                {premiumFlow === 'calculated' && (
+                  <button
+                    type="button"
+                    onClick={handleProceedToSubmit}
+                    disabled={formCdState?.cdAfterSubmit < 0}
+                    title={
+                      formCdState?.cdAfterSubmit < 0
+                        ? 'Estimated CD after this change would be negative — adjust cover or recharge CD.'
+                        : undefined
+                    }
+                    className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] ${
+                      formCdState?.cdAfterSubmit < 0
+                        ? 'text-white/90 bg-indigo-400 cursor-not-allowed shadow-none'
+                        : 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
+                    }`}
+                  >
+                    <Eye size={18} strokeWidth={2.25} aria-hidden /> Proceed to submit
+                  </button>
+                )}
+              </>
             }
           />
         </>

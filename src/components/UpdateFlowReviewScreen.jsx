@@ -24,9 +24,9 @@ export default function UpdateFlowReviewScreen({
   cdFlow = 'quick-update',
   cdFlowMeta = {},
   cdBaselineEmployees,
+  /** After form-step “Calculate premium”, preview always shows full CD breakdown. */
+  cdEstimateReady = true,
 }) {
-  // Avoid JSON.stringify(baseline) on every render — large nested objects made preview feel slow.
-  const flowMetaKey = JSON.stringify(cdFlowMeta ?? {})
   const { cdAfterSubmit, currentCd, estimatedCdDraw, cdBreakdownLines } = useMemo(
     () =>
       computeUpdateFlowCdState(employees, {
@@ -34,7 +34,7 @@ export default function UpdateFlowReviewScreen({
         flowMeta: cdFlowMeta ?? {},
         baselineEmployees: cdBaselineEmployees,
       }),
-    [employees, cdFlow, flowMetaKey, cdBaselineEmployees],
+    [employees, cdFlow, cdFlowMeta, cdBaselineEmployees],
   )
 
   return (
@@ -50,18 +50,20 @@ export default function UpdateFlowReviewScreen({
       />
 
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 lg:gap-5 lg:items-stretch min-h-0 overflow-hidden">
-        <div className="flex-1 min-w-0 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2 order-1">
-          <ReviewEmployeesPanel employees={employees} />
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col order-1 lg:min-h-0">
+          <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain space-y-3 pb-2">
+            <ReviewEmployeesPanel employees={employees} />
+          </div>
         </div>
-        <aside className="w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)] shrink-0 lg:min-h-0 flex flex-col order-2">
-          <div className="lg:sticky lg:top-4 lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
+        <aside className="w-full lg:w-[min(calc(19rem+10px),32vw)] lg:max-w-[calc(21rem+10px)] shrink-0 order-2 lg:min-h-0 flex flex-col lg:justify-start">
+          <div className="w-full lg:max-h-[min(calc(100vh-8rem),40rem)] lg:overflow-y-auto overscroll-contain pb-2">
             <CdBalanceFormWidget
               cdAfterSubmit={cdAfterSubmit}
               currentCd={currentCd}
               estimatedCdDraw={estimatedCdDraw}
               lines={cdBreakdownLines}
               primaryBatchCount={employees.length}
-              estimateReady
+              estimateReady={cdEstimateReady}
             />
           </div>
         </aside>

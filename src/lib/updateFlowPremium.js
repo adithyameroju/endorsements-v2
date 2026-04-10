@@ -27,8 +27,8 @@ const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
 
 /**
  * Rewrites premium line labels so the CD widget matches the active update flow.
- * @param {'quick-update'|'add-spouse'|'add-newborn'} flow
- * @param {{ spouseName?: string, childrenCount?: number, incrementalOnly?: boolean }} meta
+ * @param {'quick-update'|'add-spouse'|'add-newborn'|'quick-delete'} flow
+ * @param {{ spouseName?: string, childrenCount?: number, incrementalOnly?: boolean, deleteCount?: number }} meta
  */
 export function applyFlowLabelsToPremiumLines(lines, flow, meta = {}) {
   if (!lines?.length) return lines
@@ -36,15 +36,39 @@ export function applyFlowLabelsToPremiumLines(lines, flow, meta = {}) {
   const inc = meta.incrementalOnly === true
 
   const flowTitle =
-    flow === 'add-spouse'
-      ? 'Add spouse'
-      : flow === 'add-newborn'
-        ? (meta.childrenCount ?? 1) > 1
-          ? 'Add children'
-          : 'Add child'
-        : 'Quick update'
+    flow === 'quick-delete'
+      ? 'Quick delete'
+      : flow === 'add-spouse'
+        ? 'Add spouse'
+        : flow === 'add-newborn'
+          ? (meta.childrenCount ?? 1) > 1
+            ? 'Add children'
+            : 'Add child'
+          : 'Quick update'
 
   return lines.map((line) => {
+    if (flow === 'quick-delete') {
+      if (line.id === 'subtotal_ex_gst') {
+        return {
+          ...line,
+          label: `Subtotal (excl. GST) · premium released (est.) · ${meta.deleteCount ?? 0} employee(s)`,
+        }
+      }
+      if (line.id === 'gst') {
+        return { ...line, label: `${line.label} · ${flowTitle}` }
+      }
+      if (line.id === 'total') {
+        return {
+          ...line,
+          label: `Total est. CD credit (incl. GST) · ${meta.deleteCount ?? 0} removal(s)`,
+        }
+      }
+      if (['gmc_base', 'gpa_base', 'gmc_secondary', 'gmc_addons'].includes(line.id)) {
+        return { ...line, label: `${line.label} · removal (est.)` }
+      }
+      return line
+    }
+
     if (line.id === 'subtotal_ex_gst') {
       const hint = inc
         ? ' · incremental vs HR (new dependents / plan changes only)'
@@ -148,7 +172,47 @@ export function buildLifeEventCdBaselineEmployee(selectedEmployee) {
 /** Single-employee row for Quick Update (form uses `id` as employee id). */
 export function buildQuickUpdatePremiumEmployees(formData) {
   if (!formData) return []
-  return [normalizeEmployeeForPremium(formData)]
+  const deps = formData.dependents || []
+  const dependentsForPremium = deps.filter((d) => !d.removalScheduled)
+  return [
+    normalizeEmployeeForPremium({
+      ...formData,
+      dependents: dependentsForPremium,
+    }),
+  ]
+}
+
+/**
+ * Demo CD impact for quick delete: selected employees’ illustrative premium is credited back to CD.
+ */
+export function computeQuickDeleteCdState(selectedEmployees) {
+  if (!selectedEmployees?.length) {
+    return {
+      currentCd: MOCK_CD_AVAILABLE_RUPEES,
+      estimatedCdDraw: 0,
+      cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES,
+      cdBreakdownLines: [],
+    }
+  }
+  const normalized = selectedEmployees.map((emp) =>
+    normalizeEmployeeForPremium({
+      ...emp,
+      empId: emp.id,
+      plans: mergeDemoEmployeePlans(emp),
+      dependents: [],
+    }),
+  )
+  const { totalInclGst, lines: rawLines } = buildQuickAddPremiumBreakdown(normalized)
+  const lines = applyFlowLabelsToPremiumLines(rawLines, 'quick-delete', {
+    deleteCount: selectedEmployees.length,
+  })
+  const credit = totalInclGst
+  return {
+    currentCd: MOCK_CD_AVAILABLE_RUPEES,
+    estimatedCdDraw: credit,
+    cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES + credit,
+    cdBreakdownLines: lines,
+  }
 }
 
 export function buildSpouseFlowPremiumEmployees(selectedEmployee, spouseData, employeePlansOverride) {
@@ -169,6 +233,7 @@ export function buildSpouseFlowPremiumEmployees(selectedEmployee, spouseData, em
         dob: spouseData.dob,
         gender: spouseData.gender,
         dateOfMarriage: spouseData.dateOfMarriage,
+        coverageEffectiveDate: spouseData.coverageEffectiveDate,
         samePlansAsEmployee: spouseData.samePlansAsEmployee !== false,
         plans: spouseData.samePlansAsEmployee !== false
           ? cloneEmployeeGmcPlans(merged)
@@ -196,6 +261,7 @@ export function buildNewbornFlowPremiumEmployees(selectedEmployee, children, emp
       relation: c.gender === 'Female' ? 'Daughter' : 'Son',
       dob: c.dob,
       gender: c.gender,
+      coverageEffectiveDate: c.coverageEffectiveDate,
       samePlansAsEmployee: c.samePlansAsEmployee !== false,
       plans: c.samePlansAsEmployee !== false ? cloneEmployeeGmcPlans(merged) : { ...(c.plans || {}) },
     }))

@@ -1,5 +1,5 @@
-import { useRef } from 'react'
-import { Trash2, User, Heart, Users, Plus } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Trash2, User, Heart, Users, Plus, X, Undo2 } from 'lucide-react'
 import { dependentRelationGroups, basePlans } from '../data/mockData'
 import { formFieldLabelClass, formControlClass, formHelperTextClass } from '../lib/formUi'
 import PlanSelection from './PlanSelection'
@@ -29,15 +29,42 @@ const MAX_CHILDREN = 2
 const PARENT_RELATIONS = ['Father', 'Mother']
 const INLAW_RELATIONS = ['Father-in-law', 'Mother-in-law']
 
-export default function DependentForm({ dependents, onChange, employeePlans = {}, hideSectionTitle = false }) {
+function todayIsoDate() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function formatDisplayDate(iso) {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  })
+}
+
+export default function DependentForm({
+  dependents,
+  onChange,
+  employeePlans = {},
+  hideSectionTitle = false,
+  /** When set, block adding dependents beyond this count (endorsement error fix) */
+  maxDependentsAllowed = null,
+  /** Quick Update: show per-dependent coverage effective date (defaults on add to today) */
+  showCoverageEffectiveDate = false,
+  /** Quick Update: confirm removal with an effective date */
+  requireRemovalEffectiveDate = false,
+}) {
   const depIdSeq = useRef(0)
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState(null)
+  const [removalEffectiveDate, setRemovalEffectiveDate] = useState('')
   const hasEmployeeGmc = !!(employeePlans?.gmcBasePlan)
   const secondaryActive = hasActiveSecondaryGmc(employeePlans)
-  const hasParentDependent = dependents.some((d) => PARENT_RELATIONS.includes(d.relation))
-  const hasInLawDependent = dependents.some((d) => INLAW_RELATIONS.includes(d.relation))
+  const activeDependents = dependents.filter((d) => !d.removalScheduled)
+  const hasParentDependent = activeDependents.some((d) => PARENT_RELATIONS.includes(d.relation))
+  const hasInLawDependent = activeDependents.some((d) => INLAW_RELATIONS.includes(d.relation))
 
-  const countByRelation = (rel) => dependents.filter(d => d.relation === rel).length
-  const childrenCount = dependents.filter(d => CHILDREN.includes(d.relation)).length
+  const countByRelation = (rel) => activeDependents.filter((d) => d.relation === rel).length
+  const childrenCount = activeDependents.filter((d) => CHILDREN.includes(d.relation)).length
 
   const isRelationDisabled = (rel) => {
     if (PARENT_RELATIONS.includes(rel)) {
@@ -90,8 +117,11 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
     return true
   }
 
+  const atDependentCap =
+    maxDependentsAllowed != null && dependents.length >= maxDependentsAllowed
+
   const addDependentByRelation = (relation) => {
-    if (isRelationDisabled(relation)) return
+    if (atDependentCap || isRelationDisabled(relation)) return
     const inherited = hasEmployeeGmc ? cloneEmployeeGmcPlans(employeePlans) : {}
     onChange([
       ...dependents,
@@ -101,9 +131,9 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
         relation,
         dob: '',
         gender: '',
-        dateOfMarriage: relation === 'Spouse' ? '' : undefined,
         samePlansAsEmployee: true,
         plans: inherited,
+        ...(showCoverageEffectiveDate ? { coverageEffectiveDate: todayIsoDate() } : {}),
       },
     ])
   }
@@ -116,6 +146,36 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
 
   const removeDependent = (index) => {
     onChange(dependents.filter((_, i) => i !== index))
+  }
+
+  const openRemoveConfirm = (index) => {
+    if (requireRemovalEffectiveDate) {
+      setPendingRemoveIndex(index)
+      setRemovalEffectiveDate(todayIsoDate())
+    } else {
+      removeDependent(index)
+    }
+  }
+
+  const confirmRemoveWithDate = () => {
+    if (pendingRemoveIndex == null || !removalEffectiveDate) return
+    const updated = [...dependents]
+    updated[pendingRemoveIndex] = {
+      ...updated[pendingRemoveIndex],
+      removalScheduled: true,
+      removalEffectiveDate,
+    }
+    onChange(updated)
+    setPendingRemoveIndex(null)
+  }
+
+  const undoScheduledRemoval = (index) => {
+    const updated = [...dependents]
+    const next = { ...updated[index] }
+    delete next.removalScheduled
+    delete next.removalEffectiveDate
+    updated[index] = next
+    onChange(updated)
   }
 
   const setSamePlans = (index, same) => {
@@ -140,7 +200,51 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {pendingRemoveIndex != null && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-5 border border-gray-200">
+            <div className="flex items-start justify-between gap-2 mb-3">
+              <h4 className="text-sm font-semibold text-gray-900">Schedule dependent removal</h4>
+              <button
+                type="button"
+                onClick={() => setPendingRemoveIndex(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded-lg cursor-pointer"
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-xs text-gray-600 mb-3">
+              Choose the effective date when cover should end. The dependent will stay on this page as &quot;scheduled for removal&quot; until you submit or undo.
+            </p>
+            <label className={formFieldLabelClass}>Effective date of removal</label>
+            <input
+              type="date"
+              value={removalEffectiveDate}
+              onChange={(e) => setRemovalEffectiveDate(e.target.value)}
+              className={`${formControlClass} mb-4`}
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingRemoveIndex(null)}
+                className="px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-lg hover:bg-gray-50 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={!removalEffectiveDate}
+                onClick={confirmRemoveWithDate}
+                className="px-3 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 cursor-pointer"
+              >
+                Schedule removal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {!hideSectionTitle && (
         <div className="flex items-center gap-2">
           <User size={16} className="text-indigo-500 flex-shrink-0" />
@@ -169,13 +273,18 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
             this enrollment. Remove in-law dependents to add Father or Mother.
           </p>
         )}
+        {atDependentCap && (
+          <p className="mb-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            This endorsement already includes {maxDependentsAllowed} dependent(s). You can edit them but not add more here.
+          </p>
+        )}
         <div
           className="flex flex-wrap gap-2"
           role="group"
           aria-label="Add dependent by relationship"
         >
           {dependentRelationGroups.flatMap((grp) => grp.relations).map((r) => {
-            const disabled = isRelationDisabled(r)
+            const disabled = atDependentCap || isRelationDisabled(r)
             const added = showAddedCheckmark(r)
             return (
               <button
@@ -208,107 +317,143 @@ export default function DependentForm({ dependents, onChange, employeePlans = {}
         <p className="text-xs text-gray-500 py-1">No dependents yet — click a relationship below to add one.</p>
       ) : (
         <div className="space-y-4">
-          {dependents.map((dep, index) => (
-            <div key={dep.id} className="border border-gray-200 rounded-xl p-5 space-y-4 bg-white">
-              <div className="flex items-center justify-between">
-                <h4 className="text-base font-bold text-gray-900 flex items-center gap-2 tracking-tight">
-                  {getRelationIcon(dep.relation)}
-                  <span>{dep.relation}</span>
-                  <span className="text-sm font-medium text-gray-500">— Dependent {index + 1}</span>
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => removeDependent(index)}
-                  className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4">
-                <div>
-                  <label className={formFieldLabelClass}>Full Name</label>
-                  <input
-                    type="text"
-                    value={dep.name}
-                    onChange={e => updateDependent(index, 'name', e.target.value)}
-                    placeholder="Enter name"
-                    className={formControlClass}
-                  />
-                </div>
-                <div>
-                  <label className={formFieldLabelClass}>Date of Birth</label>
-                  <input
-                    type="date"
-                    value={dep.dob}
-                    onChange={e => updateDependent(index, 'dob', e.target.value)}
-                    className={formControlClass}
-                  />
-                </div>
-                {dep.relation === 'Spouse' && (
-                  <div>
-                    <label className={formFieldLabelClass}>Date of Marriage</label>
-                    <input
-                      type="date"
-                      value={dep.dateOfMarriage || ''}
-                      onChange={e => updateDependent(index, 'dateOfMarriage', e.target.value)}
-                      className={formControlClass}
-                    />
+          {dependents.map((dep, index) => {
+            const scheduled = !!dep.removalScheduled
+            const shellClass = scheduled
+              ? 'border border-dashed border-rose-200 rounded-xl p-5 space-y-4 bg-stone-50/80 opacity-[0.92] ring-1 ring-rose-100/60'
+              : 'border border-gray-200 rounded-xl p-5 space-y-4 bg-white'
+            return (
+              <div key={dep.id} className={shellClass}>
+                {scheduled && (
+                  <div className="-mx-5 -mt-5 mb-4 px-4 py-2.5 rounded-t-[0.65rem] bg-rose-50/90 border-b border-rose-100 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold text-rose-900">
+                      Scheduled for removal
+                      <span className="font-normal text-rose-800/90">
+                        {' '}
+                        · effective {formatDisplayDate(dep.removalEffectiveDate)}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => undoScheduledRemoval(index)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold text-indigo-700 bg-white border border-indigo-200 rounded-lg hover:bg-indigo-50 cursor-pointer"
+                    >
+                      <Undo2 size={12} aria-hidden />
+                      Keep dependent
+                    </button>
                   </div>
                 )}
-                <div>
-                  <label className={formFieldLabelClass}>Gender</label>
-                  <select
-                    value={dep.gender}
-                    onChange={e => updateDependent(index, 'gender', e.target.value)}
-                    className={formControlClass}
-                  >
-                    <option value="">Select</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-100 pt-4">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-sm font-bold text-gray-900">GMC Plans</span>
-                  {hasEmployeeGmc && (
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={dep.samePlansAsEmployee !== false}
-                        onChange={e => setSamePlans(index, e.target.checked)}
-                        className="accent-indigo-600 w-4 h-4 rounded"
-                      />
-                      <span className="text-sm font-semibold text-gray-700">Same as employee</span>
-                    </label>
+                <div className="flex items-center justify-between">
+                  <h4 className={`text-base font-bold flex items-center gap-2 tracking-tight ${scheduled ? 'text-gray-500' : 'text-gray-900'}`}>
+                    {getRelationIcon(dep.relation)}
+                    <span>{dep.relation}</span>
+                    <span className={`text-sm font-medium ${scheduled ? 'text-gray-400' : 'text-gray-500'}`}>— Dependent {index + 1}</span>
+                  </h4>
+                  {!scheduled && (
+                    <button
+                      type="button"
+                      onClick={() => openRemoveConfirm(index)}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                      aria-label="Remove dependent"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   )}
                 </div>
-                {dep.samePlansAsEmployee !== false && hasEmployeeGmc ? (
-                  <div className="px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-1.5">
-                    <p className={formHelperTextClass}>Inherited from employee (GMC — view only)</p>
-                    <ul className="text-sm font-medium text-gray-900 list-disc list-inside space-y-0.5">
-                      {formatInheritedGmcLines(employeePlans).map((line, i) => (
-                        <li key={i}>{line}</li>
-                      ))}
-                    </ul>
+
+                <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-5 gap-y-4 ${scheduled ? 'pointer-events-none select-none' : ''}`}>
+                  <div>
+                    <label className={formFieldLabelClass}>Full Name</label>
+                    <input
+                      type="text"
+                      value={dep.name}
+                      onChange={e => updateDependent(index, 'name', e.target.value)}
+                      placeholder="Enter name"
+                      disabled={scheduled}
+                      className={`${formControlClass} disabled:bg-gray-100/80 disabled:text-gray-500 disabled:cursor-not-allowed`}
+                    />
                   </div>
-                ) : (
-                  <PlanSelection
-                    plans={dep.plans || {}}
-                    onChange={(plans) => updateDependent(index, 'plans', plans)}
-                    label={`dep-${dep.id}`}
-                    gmcOnly
-                    hideInsuranceHeader
-                    hideGmcToggle
-                    horizontalGmcLayout
-                  />
-                )}
+                  <div>
+                    <label className={formFieldLabelClass}>Date of Birth</label>
+                    <input
+                      type="date"
+                      value={dep.dob}
+                      onChange={e => updateDependent(index, 'dob', e.target.value)}
+                      disabled={scheduled}
+                      className={`${formControlClass} disabled:bg-gray-100/80 disabled:text-gray-500 disabled:cursor-not-allowed`}
+                    />
+                  </div>
+                  <div>
+                    <label className={formFieldLabelClass}>Gender</label>
+                    <select
+                      value={dep.gender}
+                      onChange={e => updateDependent(index, 'gender', e.target.value)}
+                      disabled={scheduled}
+                      className={`${formControlClass} disabled:bg-gray-100/80 disabled:text-gray-500 disabled:cursor-not-allowed`}
+                    >
+                      <option value="">Select</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  {showCoverageEffectiveDate && (
+                    <div>
+                      <label className={formFieldLabelClass}>
+                        Coverage effective date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        value={dep.coverageEffectiveDate || ''}
+                        onChange={e => updateDependent(index, 'coverageEffectiveDate', e.target.value)}
+                        disabled={scheduled}
+                        className={`${formControlClass} disabled:bg-gray-100/80 disabled:text-gray-500 disabled:cursor-not-allowed`}
+                      />
+                      <p className={formHelperTextClass}>Defaults to the date this dependent is added.</p>
+                    </div>
+                  )}
+                </div>
+
+                <div className={`border-t border-gray-100 pt-4 ${scheduled ? 'pointer-events-none select-none opacity-80' : ''}`}>
+                  <div className="flex items-center justify-between mb-3">
+                    <span className={`text-sm font-bold ${scheduled ? 'text-gray-500' : 'text-gray-900'}`}>GMC Plans</span>
+                    {hasEmployeeGmc && (
+                      <label className={`flex items-center gap-2 ${scheduled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+                        <input
+                          type="checkbox"
+                          checked={dep.samePlansAsEmployee !== false}
+                          onChange={e => setSamePlans(index, e.target.checked)}
+                          disabled={scheduled}
+                          className="accent-indigo-600 w-4 h-4 rounded disabled:opacity-50"
+                        />
+                        <span className={`text-sm font-semibold ${scheduled ? 'text-gray-500' : 'text-gray-700'}`}>Same as employee</span>
+                      </label>
+                    )}
+                  </div>
+                  {dep.samePlansAsEmployee !== false && hasEmployeeGmc ? (
+                    <div className="px-4 py-3 bg-blue-50/50 rounded-xl border border-blue-100 space-y-1.5">
+                      <p className={formHelperTextClass}>Inherited from employee (GMC — view only)</p>
+                      <ul className="text-sm font-medium text-gray-900 list-disc list-inside space-y-0.5">
+                        {formatInheritedGmcLines(employeePlans).map((line, i) => (
+                          <li key={i}>{line}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <PlanSelection
+                      plans={dep.plans || {}}
+                      onChange={(plans) => updateDependent(index, 'plans', plans)}
+                      label={`dep-${dep.id}`}
+                      gmcOnly
+                      hideInsuranceHeader
+                      hideGmcToggle
+                      horizontalGmcLayout
+                    />
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>

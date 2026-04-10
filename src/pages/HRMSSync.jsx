@@ -112,7 +112,7 @@ export default function HRMSSync() {
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="Search by name, ID, department..."
+          placeholder="Search by name, ID, or email..."
           className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white"
         />
       </div>
@@ -122,7 +122,7 @@ export default function HRMSSync() {
         {activeTab === 'joining' && hrmsJoiningEmployees.filter(emp => {
           if (!searchQuery.trim()) return true
           const q = searchQuery.toLowerCase()
-          return emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.department.toLowerCase().includes(q)
+          return emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.email.toLowerCase().includes(q)
         }).map(emp => {
           const state = joiningStates[emp.id]
           return (
@@ -137,7 +137,7 @@ export default function HRMSSync() {
                       <p className="text-sm font-semibold text-gray-900">{emp.name}</p>
                       <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{emp.id}</span>
                     </div>
-                    <p className="text-xs text-gray-500">{emp.email} &middot; {emp.department} &middot; {emp.designation}</p>
+                    <p className="text-xs text-gray-500">{emp.email}</p>
                     <p className="text-xs text-gray-400 mt-0.5">Joining: {emp.doj}</p>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ export default function HRMSSync() {
         {activeTab === 'leaving' && hrmsLeavingEmployees.filter(emp => {
           if (!searchQuery.trim()) return true
           const q = searchQuery.toLowerCase()
-          return emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.department.toLowerCase().includes(q)
+          return emp.name.toLowerCase().includes(q) || emp.id.toLowerCase().includes(q) || emp.email.toLowerCase().includes(q)
         }).map(emp => {
           const state = leavingStates[emp.id]
           return (
@@ -204,7 +204,7 @@ export default function HRMSSync() {
                         <p className="text-sm font-semibold text-gray-900">{emp.name}</p>
                         <span className="text-[10px] font-medium text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded">{emp.id}</span>
                       </div>
-                      <p className="text-xs text-gray-500">{emp.email} &middot; {emp.department} &middot; {emp.designation}</p>
+                      <p className="text-xs text-gray-500">{emp.email}</p>
                       <p className="text-xs text-red-500 mt-0.5">Last working day: {emp.lastDate}</p>
                     </div>
                   </div>

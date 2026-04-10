@@ -91,7 +91,7 @@ export default function AddDependents() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-gray-900">{emp.name}</p>
-                    <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.department}</p>
+                    <p className="text-xs text-gray-500 truncate">{emp.id} &middot; {emp.email}</p>
                   </div>
                 </button>
               ))
@@ -116,7 +116,7 @@ export default function AddDependents() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold text-gray-900">{selectedEmployee.name}</p>
-                  <p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.department}</p>
+                  <p className="text-xs text-gray-500">{selectedEmployee.id} &middot; {selectedEmployee.email}</p>
                 </div>
               </div>
             </section>
@@ -147,7 +147,25 @@ export default function AddDependents() {
             <button
               type="button"
               onClick={() => {
-                addEntry({ action: 'Add Dependents', count: dependents.length, status: 'Success', type: 'quick' })
+                addEntry({
+                  action: 'Add Dependents',
+                  count: dependents.length,
+                  status: 'Success',
+                  type: 'quick',
+                  changeSummary: {
+                    title: 'Dependents added to cover',
+                    lines: dependents.map((d) => d.name?.trim() || 'Dependent'),
+                  },
+                  premiumSummary: {
+                    totalInclGst: dependents.length * 16520,
+                    gstRatePercent: 18,
+                    lines: [
+                      { label: `Dependent premium × ${dependents.length} (mock)`, amount: dependents.length * 14000 },
+                      { label: 'GST (18%)', amount: Math.round(dependents.length * 14000 * 0.18) },
+                      { label: 'Total (incl. GST)', amount: dependents.length * 16520 },
+                    ],
+                  },
+                })
                 setSubmitted(true)
                 setTimeout(() => navigate('/'), 2000)
               }}

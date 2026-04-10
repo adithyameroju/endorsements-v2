@@ -67,6 +67,28 @@ function fieldCount(emp) {
 const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
 const CD_BALANCE_VISIBLE_KEY = 'quickAdd_cdBalanceVisible'
 const CD_PLACEMENT_STORAGE_KEY = 'quickAdd_cdPlacement'
+const CD_DEMO_SCENARIO_KEY = 'quickAdd_cdDemoScenario'
+
+const CD_DEMO = {
+  NORMAL: 'normal',
+  BLOCKED_ENTRY: 'blocked_entry',
+  INSUFFICIENT_SECOND: 'insufficient_second_employee',
+  INSUFFICIENT_DEP: 'insufficient_dependent',
+}
+
+function readStoredCdDemoScenario() {
+  try {
+    const v = sessionStorage.getItem(CD_DEMO_SCENARIO_KEY)
+    if (v && Object.values(CD_DEMO).includes(v)) return v
+  } catch {
+    /* ignore */
+  }
+  return CD_DEMO.NORMAL
+}
+
+function stripDependentsForPremium(list) {
+  return list.map((e) => ({ ...e, dependents: [] }))
+}
 
 function readStoredCdBalanceVisible() {
   try {
@@ -99,6 +121,7 @@ export default function QuickAdd() {
   const [activeTab, setActiveTab] = useState(0)
   const [cdBalanceVisible, setCdBalanceVisible] = useState(readStoredCdBalanceVisible)
   const [cdPlacement, setCdPlacement] = useState(readStoredCdPlacement)
+  const [cdDemoScenario, setCdDemoScenario] = useState(readStoredCdDemoScenario)
   const [isLgViewport, setIsLgViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches,
   )
@@ -116,14 +139,29 @@ export default function QuickAdd() {
   const isFirstEmployeesEffect = useRef(true)
   const suppressPremiumStaleOnce = useRef(false)
 
-  const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines } = useMemo(() => {
+  const { estimatedCdDraw, cdAfterSubmit, cdBreakdownLines, effectiveCurrentCd, cdInsufficientAfterEstimate } = useMemo(() => {
     const { totalInclGst, lines } = buildQuickAddPremiumBreakdown(employees)
+    let effectiveCd = MOCK_CD_AVAILABLE_RUPEES
+
+    if (cdDemoScenario === CD_DEMO.INSUFFICIENT_SECOND && employees.length >= 2) {
+      const firstOnlyTotal = buildQuickAddPremiumBreakdown([employees[0]]).totalInclGst
+      effectiveCd = firstOnlyTotal
+    } else if (cdDemoScenario === CD_DEMO.INSUFFICIENT_DEP) {
+      const hasDeps = employees.some((e) => (e.dependents?.length || 0) > 0)
+      if (hasDeps) {
+        effectiveCd = buildQuickAddPremiumBreakdown(stripDependentsForPremium(employees)).totalInclGst
+      }
+    }
+
+    const cdAfter = effectiveCd - totalInclGst
     return {
       estimatedCdDraw: totalInclGst,
-      cdAfterSubmit: MOCK_CD_AVAILABLE_RUPEES - totalInclGst,
+      cdAfterSubmit: cdAfter,
       cdBreakdownLines: lines,
+      effectiveCurrentCd: effectiveCd,
+      cdInsufficientAfterEstimate: cdAfter < 0,
     }
-  }, [employees])
+  }, [employees, cdDemoScenario])
 
   const batchSummary = useMemo(() => {
     const count = employees.length
@@ -186,6 +224,10 @@ export default function QuickAdd() {
     [],
   )
 
+  useEffect(() => {
+    if (cdDemoScenario === CD_DEMO.BLOCKED_ENTRY) setShowPreview(false)
+  }, [cdDemoScenario])
+
   /** CD widget shows pro-rata breakdown + impact only after Calculate premium. */
   const cdEstimateReady = premiumFlow === 'calculated'
 
@@ -215,6 +257,24 @@ export default function QuickAdd() {
       /* ignore */
     }
   }
+
+  const persistCdDemoScenario = (value) => {
+    setCdDemoScenario(value)
+    try {
+      sessionStorage.setItem(CD_DEMO_SCENARIO_KEY, value)
+    } catch {
+      /* ignore */
+    }
+  }
+
+  const handleRechargeDemo = () => {
+    window.alert('Demo only: this would open CD recharge, billing, or a request to your account manager.')
+  }
+
+  const cdDemoRechargeWidgetProps =
+    cdDemoScenario !== CD_DEMO.NORMAL
+      ? { rechargeCtaLabel: 'Recharge CD (demo)', onRechargeClick: handleRechargeDemo }
+      : {}
 
   const updateEmployee = (index, field, value) => {
     const updated = [...employees]
@@ -363,7 +423,10 @@ export default function QuickAdd() {
         break
       }
     }
-    if (!hasErrors) setShowPreview(true)
+    if (!hasErrors) {
+      if (cdAfterSubmit < 0) return
+      setShowPreview(true)
+    }
   }
 
   const prefillData = () => {
@@ -433,11 +496,29 @@ export default function QuickAdd() {
   }
 
   const handleSubmit = () => {
-    const details = employees.map(emp => ({
+    if (cdAfterSubmit < 0) return
+    const { totalInclGst, lines: premLines, gstRatePercent } = buildQuickAddPremiumBreakdown(employees)
+    const details = employees.map((emp) => ({
       name: emp.name,
       id: emp.empId,
+      email: emp.email || '',
     }))
-    addEntry({ action: 'Add Employee', count: employees.length, status: 'Success', type: 'quick', details })
+    addEntry({
+      action: 'Add Employee',
+      count: employees.length,
+      status: 'Success',
+      type: 'quick',
+      details,
+      changeSummary: {
+        title: 'Employees added to policy',
+        lines: employees.map((e) => `${e.name || 'Unnamed'} (${e.empId || '—'})`),
+      },
+      premiumSummary: {
+        totalInclGst,
+        gstRatePercent,
+        lines: premLines.map((l) => ({ label: l.label, amount: l.amount })),
+      },
+    })
     clearQuickAddDraft()
     setHasDraftOnDisk(false)
     navigate('/')
@@ -860,11 +941,12 @@ export default function QuickAdd() {
   const renderCdSidebarFormPanel = () => (
     <CdBalanceFormWidget
       cdAfterSubmit={cdAfterSubmit}
-      currentCd={MOCK_CD_AVAILABLE_RUPEES}
+      currentCd={effectiveCurrentCd}
       estimatedCdDraw={estimatedCdDraw}
       lines={cdBreakdownLines}
       primaryBatchCount={employees.length}
       estimateReady={cdEstimateReady}
+      {...cdDemoRechargeWidgetProps}
     />
   )
 
@@ -891,11 +973,12 @@ export default function QuickAdd() {
         <CdBalanceFormWidget
           variant="embedded"
           cdAfterSubmit={cdAfterSubmit}
-          currentCd={MOCK_CD_AVAILABLE_RUPEES}
+          currentCd={effectiveCurrentCd}
           estimatedCdDraw={estimatedCdDraw}
           lines={cdBreakdownLines}
           primaryBatchCount={employees.length}
           estimateReady={cdEstimateReady}
+          {...cdDemoRechargeWidgetProps}
         />
       </div>
     </div>
@@ -911,11 +994,61 @@ export default function QuickAdd() {
         cdBreakdownLines={cdBreakdownLines}
         estimatedCdDraw={estimatedCdDraw}
         cdAfterSubmit={cdAfterSubmit}
-        currentCd={MOCK_CD_AVAILABLE_RUPEES}
+        currentCd={effectiveCurrentCd}
         draftBanner={draftBanner}
         onClearDraft={handleClearDraft}
         hasDraftOnDisk={hasDraftOnDisk}
+        cdSubmitBlocked={cdAfterSubmit < 0}
+        onRechargeDemo={cdAfterSubmit < 0 ? handleRechargeDemo : undefined}
       />
+    )
+  }
+
+  if (cdDemoScenario === CD_DEMO.BLOCKED_ENTRY) {
+    return (
+      <div className="flex flex-col h-full min-h-0 px-6 lg:px-8 pt-4 pb-6">
+        <div className="flex-shrink-0 mb-2">
+          <PageHeader
+            title="Quick Add Employees"
+            subtitle="Up to 5 employees — plans and dependents"
+            breadcrumbs={[{ label: 'Add Employee', path: '/add' }, { label: 'Quick Add' }]}
+            trailing={<Stepper steps={['Employee Details', 'Preview & Submit']} currentStep={1} compact />}
+            navTrailing={
+              <div className="flex flex-wrap items-center justify-end gap-2 flex-shrink-0">
+                <label className="sr-only" htmlFor="quickadd-cd-demo-scenario-gate">
+                  CD balance demo scenario
+                </label>
+                <select
+                  id="quickadd-cd-demo-scenario-gate"
+                  aria-label="CD balance demo scenario"
+                  value={cdDemoScenario}
+                  onChange={(e) => persistCdDemoScenario(e.target.value)}
+                  className="px-3 py-1.5 text-xs border border-amber-200 rounded-lg bg-amber-50/80 font-medium max-w-[10rem] sm:max-w-[15rem]"
+                  title="Switch CD demo scenario"
+                >
+                  <option value={CD_DEMO.NORMAL}>CD: Normal</option>
+                  <option value={CD_DEMO.BLOCKED_ENTRY}>Demo: Block at entry</option>
+                  <option value={CD_DEMO.INSUFFICIENT_SECOND}>Demo: 2nd employee</option>
+                  <option value={CD_DEMO.INSUFFICIENT_DEP}>Demo: Dependent</option>
+                </select>
+              </div>
+            }
+          />
+        </div>
+        <div className="flex-1 min-h-0 flex flex-col items-center justify-center rounded-2xl border border-amber-200/90 bg-gradient-to-b from-amber-50/90 to-white px-6 py-10 text-center shadow-sm">
+          <div className="w-16 h-16 rounded-2xl bg-amber-100 flex items-center justify-center mb-5">
+            <Wallet size={32} className="text-amber-700" aria-hidden />
+          </div>
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Your CD balance is very low</h1>
+          <p className="mt-3 max-w-md text-sm text-gray-600 leading-relaxed">
+            Quick Add is paused until your Cash Deposit (CD) wallet is back at a comfortable level. Use the navigation
+            above to go back, or switch the demo scenario when you are ready to continue exploring.
+          </p>
+          <p className="mt-8 text-[11px] text-gray-400 max-w-sm">
+            Demo: change scenario with the dropdown in the header, or use <span className="font-medium text-gray-500">Add Employee</span> in the breadcrumbs to leave this flow.
+          </p>
+        </div>
+      </div>
     )
   }
 
@@ -953,6 +1086,18 @@ export default function QuickAdd() {
               >
                 <option value="sidebar">Sidebar CD balance</option>
                 <option value="bottom">Bottom CD balance</option>
+              </select>
+              <select
+                aria-label="CD balance demo scenario"
+                value={cdDemoScenario}
+                onChange={(e) => persistCdDemoScenario(e.target.value)}
+                className="px-3 py-1.5 text-xs border border-amber-200 rounded-lg bg-amber-50/80 font-medium max-w-[10rem] sm:max-w-[15rem]"
+                title="Switch CD wallet stories for demos — Normal keeps the default sufficient balance"
+              >
+                <option value={CD_DEMO.NORMAL}>CD: Normal</option>
+                <option value={CD_DEMO.BLOCKED_ENTRY}>Demo: Block at entry</option>
+                <option value={CD_DEMO.INSUFFICIENT_SECOND}>Demo: 2nd employee</option>
+                <option value={CD_DEMO.INSUFFICIENT_DEP}>Demo: Dependent</option>
               </select>
               <button
                 type="button"
@@ -1023,6 +1168,26 @@ export default function QuickAdd() {
           role="status"
         >
           {draftBanner}
+        </div>
+      )}
+
+      {cdEstimateReady && cdInsufficientAfterEstimate && (
+        <div
+          className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-red-200 bg-red-50/95 px-3 py-2.5 text-xs text-red-950"
+          role="alert"
+        >
+          <span className="font-medium min-w-0">
+            Estimated CD balance after this batch would be negative. Recharge your CD or remove employees / dependents before previewing.
+          </span>
+          {cdDemoScenario !== CD_DEMO.NORMAL && (
+            <button
+              type="button"
+              onClick={handleRechargeDemo}
+              className="shrink-0 px-3 py-1.5 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 cursor-pointer"
+            >
+              Recharge (demo)
+            </button>
+          )}
         </div>
       )}
 
@@ -1149,7 +1314,17 @@ export default function QuickAdd() {
               <button
                 type="button"
                 onClick={handlePreview}
-                className="w-full sm:w-auto px-6 py-3.5 text-sm font-bold text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 shadow-md shadow-indigo-600/20 inline-flex items-center justify-center gap-2 cursor-pointer flex-shrink-0 min-h-[3rem]"
+                disabled={cdAfterSubmit < 0}
+                title={
+                  cdAfterSubmit < 0
+                    ? 'CD balance is not sufficient for this batch (est.) — recharge or reduce the batch.'
+                    : undefined
+                }
+                className={`w-full sm:w-auto px-6 py-3.5 text-sm font-bold rounded-xl inline-flex items-center justify-center gap-2 flex-shrink-0 min-h-[3rem] ${
+                  cdAfterSubmit < 0
+                    ? 'text-white/90 bg-indigo-400 cursor-not-allowed shadow-none'
+                    : 'text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/20 cursor-pointer'
+                }`}
               >
                 <Eye size={18} strokeWidth={2.25} aria-hidden /> Preview &amp; Submit
               </button>
