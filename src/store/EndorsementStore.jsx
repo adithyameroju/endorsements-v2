@@ -33,6 +33,9 @@ export function EndorsementProvider({ children }) {
       status: requestedStatus = 'Success',
       successCount: successCountOpt,
       failedCount: failedCountOpt,
+      actorType,
+      automationSource,
+      actionCategory,
     } = opts
 
     const id = Date.now() + Math.floor(Math.random() * 1000)
@@ -54,6 +57,9 @@ export function EndorsementProvider({ children }) {
       isNew: true,
       ...(typeof successCountOpt === 'number' ? { successCount: successCountOpt } : {}),
       ...(typeof failedCountOpt === 'number' ? { failedCount: failedCountOpt } : {}),
+      ...(actorType ? { actorType } : {}),
+      ...(automationSource ? { automationSource } : {}),
+      ...(actionCategory ? { actionCategory } : {}),
     }
 
     setHistory((prev) => [entry, ...prev])

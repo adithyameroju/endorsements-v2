@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [react(), tailwindcss()],
   base: mode === 'production' ? './' : '/',
   server: {
-    port: 5180,
+    port: 5181,
     strictPort: true,
     /** Listen on all interfaces so localhost / 127.0.0.1 / LAN IP all work */
     host: true,

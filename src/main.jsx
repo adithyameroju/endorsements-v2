@@ -8,7 +8,7 @@ import EnsureHashRoute from './EnsureHashRoute.jsx'
 /**
  * HashRouter reads routes from `location.hash` (e.g. `#/add/quick`) so the app works on GitHub Pages.
  * On the local dev/preview server, if someone opens a path-style URL without a hash
- * (e.g. `http://127.0.0.1:5180/add/quick`), normalize once to `#/add/quick`.
+ * (e.g. `http://127.0.0.1:5181/add/quick`), normalize once to `#/add/quick`.
  * (Production on github.io is not treated as "local" here.)
  */
 function redirectPathnameToHashIfNeeded() {

@@ -15,6 +15,7 @@ import DeleteEmployee from './pages/DeleteEmployee'
 import QuickDelete from './pages/QuickDelete'
 import BulkDelete from './pages/BulkDelete'
 import HRMSSync from './pages/HRMSSync'
+import EndorsementSchedule from './pages/EndorsementSchedule'
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<EndorsementsDashboard />} />
+          <Route path="/endorsements/schedule" element={<EndorsementSchedule />} />
           <Route path="/add" element={<AddEmployee />} />
           <Route path="/add/quick" element={<QuickAdd />} />
           <Route path="/add/bulk" element={<BulkUpload />} />

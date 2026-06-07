@@ -25,9 +25,9 @@ npm run dev
 
 While developing (`npm run dev`), routes work like a normal site — **no `#` required**:
 
-**http://127.0.0.1:5180/** or **http://localhost:5180/** (this project is pinned to **5180**)
+**http://127.0.0.1:5181/** or **http://localhost:5181/** (this project is pinned to **5181**)
 
-Examples: **http://127.0.0.1:5180/add/quick** for Quick Add.
+Examples: **http://127.0.0.1:5181/add/quick** for Quick Add.
 
 If that does not connect (some Mac setups resolve `localhost` to IPv6 only), run:
 
@@ -35,7 +35,7 @@ If that does not connect (some Mac setups resolve `localhost` to IPv6 only), run
 npm run dev:ip
 ```
 
-Then open **http://127.0.0.1:5180/**
+Then open **http://127.0.0.1:5181/**
 
 **Production** (GitHub Pages / `npm run preview` after build) still uses **hash URLs** like `https://…github.io/…/#/add/quick`.
 

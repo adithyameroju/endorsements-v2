@@ -15,8 +15,8 @@ npm install
 npm run dev
 ```
 
-Open **http://127.0.0.1:5180/** (this repo uses port **5180** so it does not clash with the default Vite port).  
-If **`localhost:5180`** does not load, use **`127.0.0.1`** instead (common on macOS IPv6 vs IPv4).  
+Open **http://127.0.0.1:5181/** (this repo uses port **5181** — other local projects often use **5180**).  
+If **`localhost:5181`** does not load, use **`127.0.0.1`** instead (common on macOS IPv6 vs IPv4).  
 **Dev** uses normal paths (e.g. `/add/quick`); **production** on GitHub Pages still uses `#/…` in the URL.
 
 **Cursor:** *Terminal → Run Task → “Start app (Vite)”* or run `npm run dev` in the integrated terminal.
