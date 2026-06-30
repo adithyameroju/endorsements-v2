@@ -43,7 +43,7 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
   const navigate = useNavigate()
 
   return (
-    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden px-6 pt-10 pb-3 lg:px-8">
+    <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden px-6 pt-7 pb-3 lg:px-8">
       <div className="mb-3 flex-shrink-0 flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-gray-900">Endorsements</h1>

@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import { EndorsementProvider } from './store/EndorsementStore'
+import { EntityProvider } from './context/EntityContext'
+import { AlertsProvider } from './context/AlertsContext'
 import EndorsementsDashboard from './pages/EndorsementsDashboard'
 import AddEmployee from './pages/AddEmployee'
 import QuickAdd from './pages/QuickAdd'
@@ -16,31 +18,37 @@ import QuickDelete from './pages/QuickDelete'
 import BulkDelete from './pages/BulkDelete'
 import HRMSSync from './pages/HRMSSync'
 import EndorsementSchedule from './pages/EndorsementSchedule'
+import CdBalanceEnterprise from './pages/CdBalanceEnterprise'
 
 export default function App() {
   return (
-    <EndorsementProvider>
-      <Layout>
-        <Routes>
-          <Route path="/" element={<EndorsementsDashboard />} />
-          <Route path="/endorsements/schedule" element={<EndorsementSchedule />} />
-          <Route path="/add" element={<AddEmployee />} />
-          <Route path="/add/quick" element={<QuickAdd />} />
-          <Route path="/add/bulk" element={<BulkUpload />} />
-          <Route path="/update" element={<UpdateEmployee />} />
-          <Route path="/update/quick" element={<QuickUpdate />} />
-          <Route path="/update/bulk" element={<BulkUpdate />} />
-          <Route path="/update/add-dependents" element={<AddDependents />} />
-          <Route path="/update/life-event/spouse" element={<LifeEventSpouse />} />
-          <Route path="/update/life-event/newborn" element={<LifeEventNewborn />} />
-          <Route path="/delete" element={<DeleteEmployee />} />
-          <Route path="/delete/quick" element={<QuickDelete />} />
-          <Route path="/delete/bulk" element={<BulkDelete />} />
-          <Route path="/hrms-sync" element={<HRMSSync />} />
-          {/* Sidebar links (Dashboard, Claims, etc.) point here until those pages exist */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Layout>
-    </EndorsementProvider>
+    <EntityProvider>
+      <AlertsProvider>
+        <EndorsementProvider>
+          <Layout>
+            <Routes>
+              <Route path="/" element={<EndorsementsDashboard />} />
+              <Route path="/endorsements/schedule" element={<EndorsementSchedule />} />
+              <Route path="/add" element={<AddEmployee />} />
+              <Route path="/add/quick" element={<QuickAdd />} />
+              <Route path="/add/bulk" element={<BulkUpload />} />
+              <Route path="/update" element={<UpdateEmployee />} />
+              <Route path="/update/quick" element={<QuickUpdate />} />
+              <Route path="/update/bulk" element={<BulkUpdate />} />
+              <Route path="/update/add-dependents" element={<AddDependents />} />
+              <Route path="/update/life-event/spouse" element={<LifeEventSpouse />} />
+              <Route path="/update/life-event/newborn" element={<LifeEventNewborn />} />
+              <Route path="/delete" element={<DeleteEmployee />} />
+              <Route path="/delete/quick" element={<QuickDelete />} />
+              <Route path="/delete/bulk" element={<BulkDelete />} />
+              <Route path="/hrms-sync" element={<HRMSSync />} />
+              <Route path="/cd-balance" element={<CdBalanceEnterprise />} />
+              {/* Sidebar links (Dashboard, Claims, etc.) point here until those pages exist */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Layout>
+        </EndorsementProvider>
+      </AlertsProvider>
+    </EntityProvider>
   )
 }
