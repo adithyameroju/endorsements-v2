@@ -19,6 +19,7 @@ import BulkDelete from './pages/BulkDelete'
 import HRMSSync from './pages/HRMSSync'
 import EndorsementSchedule from './pages/EndorsementSchedule'
 import CdBalanceEnterprise from './pages/CdBalanceEnterprise'
+import AiEndorsements from './pages/AiEndorsements'
 
 export default function App() {
   return (
@@ -43,6 +44,7 @@ export default function App() {
               <Route path="/delete/bulk" element={<BulkDelete />} />
               <Route path="/hrms-sync" element={<HRMSSync />} />
               <Route path="/cd-balance" element={<CdBalanceEnterprise />} />
+              <Route path="/ai-endorsements" element={<AiEndorsements />} />
               {/* Sidebar links (Dashboard, Claims, etc.) point here until those pages exist */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

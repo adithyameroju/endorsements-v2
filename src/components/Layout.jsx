@@ -14,7 +14,7 @@ const navItems = [
   { icon: BarChart3, label: 'Reports', path: '/reports' },
 ]
 
-const endorsementPaths = ['/', '/add', '/update', '/delete', '/hrms-sync']
+const endorsementPaths = ['/', '/add', '/update', '/delete', '/hrms-sync', '/ai-endorsements']
 
 function isEndorsementRoute(pathname) {
   return endorsementPaths.some(p =>

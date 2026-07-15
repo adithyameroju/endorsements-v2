@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, ChevronRight } from 'lucide-react'
+import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, ChevronRight, Sparkles } from 'lucide-react'
 import EndorsementHistory from '../components/endorsements-v2/EndorsementHistory'
 import EndorsementsExperienceSelect from '../components/EndorsementsExperienceSelect'
 import { hrmsJoiningEmployees, hrmsLeavingEmployees } from '../data/mockData'
@@ -34,6 +34,16 @@ const actions = [
     borderColor: 'border-rose-100 hover:border-rose-200',
     path: '/delete',
   },
+  {
+    title: 'AI Endorsements',
+    description: 'Upload any file and let AI extract additions, updates, and deletions',
+    icon: Sparkles,
+    iconBg: 'bg-gradient-to-br from-indigo-500 to-violet-600',
+    decorBg: 'bg-violet-100',
+    borderColor: 'border-violet-100 hover:border-violet-300',
+    path: '/ai-endorsements',
+    ai: true,
+  },
 ]
 
 /**
@@ -54,7 +64,7 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
         <EndorsementsExperienceSelect value={experience} onChange={onExperienceChange} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3 flex-shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-3 flex-shrink-0">
         {actions.map((item) => {
           const Icon = item.icon
           return (
@@ -71,6 +81,9 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${item.iconBg} shadow-sm`}>
                     <Icon size={22} className="text-white" />
                   </div>
+                  {item.ai && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200 tracking-wide">AI</span>
+                  )}
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 mb-0.5">{item.title}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
