@@ -156,6 +156,33 @@ input[type="date"][value]:not([value=""]) {
   color: #1e1b4b;
 }
 
+/* Schedule row — breathing highlight while PDF is generating */
+@keyframes schedule-row-breathe {
+  0%, 100% {
+    background-color: rgb(238 242 255 / 0.45);
+  }
+  50% {
+    background-color: rgb(224 231 255 / 0.9);
+  }
+}
+
+.schedule-row-generating {
+  animation: schedule-row-breathe 2.4s ease-in-out infinite;
+  box-shadow: inset 3px 0 0 0 rgb(99 102 241 / 0.5);
+}
+
+.schedule-row-generating:hover {
+  animation: none;
+  background-color: rgb(224 231 255 / 0.9);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .schedule-row-generating {
+    animation: none;
+    background-color: rgb(238 242 255 / 0.75);
+  }
+}
+
 ::-webkit-scrollbar {
   width: 6px;
 }

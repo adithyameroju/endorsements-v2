@@ -230,7 +230,10 @@ export default function EndorsementHistoryScheduleV2({
   const [scheduleSort, setScheduleSort] = useState(() => ({ key: 'date', dir: 'desc' }))
   const [bulkGenerating, setBulkGenerating] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [highlightScheduleRef, setHighlightScheduleRef] = useState(null)
   const genTimersRef = useRef([])
+  const highlightTimerRef = useRef(null)
+  const generatingRowRef = useRef(null)
 
   useEffect(() => {
     return () => {
@@ -338,12 +341,27 @@ export default function EndorsementHistoryScheduleV2({
     setTablePage(1)
     genTimersRef.current.forEach((tid) => window.clearTimeout(tid))
     genTimersRef.current = []
-    generateClubbedPendingSchedules(history, updateEntry, genTimersRef, {
+    const batchRef = generateClubbedPendingSchedules(history, updateEntry, genTimersRef, {
       onBatchComplete: () => {
         setBulkGenerating(false)
+        setHighlightScheduleRef(null)
       },
     })
+    if (batchRef) {
+      setHighlightScheduleRef(batchRef)
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current)
+    }
   }
+
+  useEffect(() => {
+    if (!highlightScheduleRef || scheduleChipFilter !== 'generated') return
+    const timer = window.setTimeout(() => {
+      if (generatingRowRef.current) {
+        generatingRowRef.current.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      }
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [highlightScheduleRef, scheduleChipFilter, paginatedRows])
 
   const tableColSpan = isPendingView ? 6 : 7
 
@@ -596,8 +614,15 @@ export default function EndorsementHistoryScheduleV2({
                   </td>
                 </tr>
               ) : (
-                paginatedRows.map((row) => (
-                  <tr key={row.id} className="transition-colors hover:bg-gray-50/70">
+                paginatedRows.map((row) => {
+                  const isGenerating = row.schedulePdfStatus === 'generating'
+                  const isHighlightedRef = highlightScheduleRef && row.scheduleRef === highlightScheduleRef
+                  return (
+                  <tr
+                    key={row.id}
+                    ref={isGenerating && isHighlightedRef ? generatingRowRef : null}
+                    className={`transition-colors ${isGenerating ? 'schedule-row-generating' : 'hover:bg-gray-50/70'}`}
+                  >
                     {isPendingView ? (
                       <>
                         <td className={`min-w-0 align-middle ${ENDORSEMENT_TABLE_CELL_EDGE_PL}`}>
@@ -654,7 +679,8 @@ export default function EndorsementHistoryScheduleV2({
                       </>
                     )}
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
