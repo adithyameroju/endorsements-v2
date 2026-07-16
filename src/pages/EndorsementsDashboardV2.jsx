@@ -1,7 +1,9 @@
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, ChevronRight, Sparkles } from 'lucide-react'
 import EndorsementHistory from '../components/endorsements-v2/EndorsementHistory'
 import EndorsementsExperienceSelect from '../components/EndorsementsExperienceSelect'
+import AiEndorsementSpotlight from '../components/AiEndorsementSpotlight'
 import { hrmsJoiningEmployees, hrmsLeavingEmployees } from '../data/mockData'
 
 const pendingHrmsCount = hrmsJoiningEmployees.length + hrmsLeavingEmployees.length
@@ -51,6 +53,10 @@ const actions = [
  */
 export default function EndorsementsDashboardV2({ experience, onExperienceChange }) {
   const navigate = useNavigate()
+  const aiCardRef = useRef(null)
+  const [showAiIntro, setShowAiIntro] = useState(true)
+
+  const dismissAiIntro = () => setShowAiIntro(false)
 
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 flex-col overflow-hidden px-6 pt-7 pb-3 lg:px-8">
@@ -70,9 +76,14 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
           return (
             <button
               key={item.title}
-              onClick={() => navigate(item.path)}
-              className={`group relative overflow-hidden flex flex-col justify-between p-5 bg-white rounded-2xl border ${item.borderColor} transition-all hover:shadow-lg cursor-pointer text-left min-h-[130px]`}
+              ref={item.ai ? aiCardRef : undefined}
+              onClick={() => {
+                if (item.ai && showAiIntro) dismissAiIntro()
+                navigate(item.path)
+              }}
+              className={`group relative overflow-hidden flex flex-col justify-between p-5 bg-white rounded-2xl border ${item.borderColor} transition-all hover:shadow-lg cursor-pointer text-left min-h-[130px] ${item.ai && showAiIntro ? 'z-[260]' : ''}`}
             >
+              {item.ai && <span aria-hidden="true" className="ai-card-trace-wrap" />}
               <div className={`absolute -top-6 -right-6 w-24 h-24 ${item.decorBg} rounded-full opacity-60 group-hover:opacity-80 transition-opacity pointer-events-none`} />
               <div className={`absolute -top-3 -right-3 w-16 h-16 ${item.decorBg} rounded-full opacity-40 pointer-events-none`} />
 
@@ -82,7 +93,9 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
                     <Icon size={22} className="text-white" />
                   </div>
                   {item.ai && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-violet-100 text-violet-700 border border-violet-200 tracking-wide">AI</span>
+                    <span className="relative inline-flex items-center px-2 py-0.5 rounded-full border border-violet-300 bg-violet-50 overflow-hidden">
+                      <span className="new-tag-shimmer text-[10px] font-extrabold tracking-widest uppercase select-none">New</span>
+                    </span>
                   )}
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 mb-0.5">{item.title}</h3>
@@ -121,6 +134,12 @@ export default function EndorsementsDashboardV2({ experience, onExperienceChange
       <div className="flex-1 min-h-0">
         <EndorsementHistory />
       </div>
+
+      <AiEndorsementSpotlight
+        targetRef={aiCardRef}
+        open={showAiIntro}
+        onDismiss={dismissAiIntro}
+      />
     </div>
   )
 }
