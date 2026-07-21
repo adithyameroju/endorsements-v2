@@ -1,7 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import {
-  LayoutDashboard, FileHeart, FileText, Wallet, Shield, BarChart3, Bell,
-  ChevronDown, Building2, HelpCircle, Menu
+  LayoutDashboard, FileHeart, FileText, Wallet, BarChart3, Bell,
+  HelpCircle, Menu
 } from 'lucide-react'
 import { useState } from 'react'
 
@@ -10,11 +10,10 @@ const navItems = [
   { icon: FileHeart, label: 'Claims', path: '/claims' },
   { icon: FileText, label: 'Endorsements', path: '/' },
   { icon: Wallet, label: 'CD Balance', path: '/cd-balance' },
-  { icon: Shield, label: 'Policy Management', path: '/policy-management' },
   { icon: BarChart3, label: 'Reports', path: '/reports' },
 ]
 
-const endorsementPaths = ['/', '/add', '/update', '/delete', '/hrms-sync', '/ai-endorsements']
+const endorsementPaths = ['/', '/add', '/update', '/delete', '/hrms-sync']
 
 function isEndorsementRoute(pathname) {
   return endorsementPaths.some(p =>

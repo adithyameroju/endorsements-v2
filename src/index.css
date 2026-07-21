@@ -82,6 +82,37 @@ body {
   box-shadow: 0 0 0 2px rgb(248 113 113 / 0.45);
 }
 
+/** Flash toasts — enter from above, exit slide up + fade */
+@keyframes portal-toast-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -0.75rem);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes portal-toast-exit {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -0.75rem);
+  }
+}
+
+.portal-toast-enter {
+  animation: portal-toast-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.portal-toast-exit {
+  animation: portal-toast-exit 320ms cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
 /* Error summary strip — same motion as sections; static ring when user prefers reduced motion */
 .quickadd-error-banner-emphasis {
   animation: quickadd-shake 0.6s ease-in-out;
@@ -154,151 +185,6 @@ input[type="date"]:hover {
 input[type="date"]:not(:placeholder-shown),
 input[type="date"][value]:not([value=""]) {
   color: #1e1b4b;
-}
-
-/* Schedule row — breathing highlight while PDF is generating */
-@keyframes schedule-row-breathe {
-  0%, 100% {
-    background-color: rgb(238 242 255 / 0.45);
-  }
-  50% {
-    background-color: rgb(224 231 255 / 0.9);
-  }
-}
-
-.schedule-row-generating {
-  animation: schedule-row-breathe 2.4s ease-in-out infinite;
-  box-shadow: inset 3px 0 0 0 rgb(99 102 241 / 0.5);
-}
-
-.schedule-row-generating:hover {
-  animation: none;
-  background-color: rgb(224 231 255 / 0.9);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .schedule-row-generating {
-    animation: none;
-    background-color: rgb(238 242 255 / 0.75);
-  }
-}
-
-/* ── AI card border trace ── */
-
-/*
-  @property lets us animate the conic-gradient sweep angle directly.
-  The colored arc starts at 0 ° and grows clockwise to 354 °, leaving
-  the trace behind as it travels — so the border is progressively filled.
-  Start angle 45 ° in the gradient ≈ top-right corner on a landscape card.
-  White ::after masks the card interior; only the 1.5 px border ring shows.
-*/
-@property --ai-trace-sweep {
-  syntax: '<angle>';
-  initial-value: 0deg;
-  inherits: false;
-}
-
-@keyframes ai-card-trace-grow {
-  from { --ai-trace-sweep: 0deg; }
-  to   { --ai-trace-sweep: 354deg; }
-}
-
-@keyframes ai-card-trace-fade-out {
-  from { opacity: 1; }
-  to   { opacity: 0; visibility: hidden; }
-}
-
-@keyframes ai-spotlight-pulse {
-  0%, 100% {
-    box-shadow:
-      0 0 0 4px rgba(139, 92, 246, 0.2),
-      0 0 20px rgba(139, 92, 246, 0.25);
-  }
-  50% {
-    box-shadow:
-      0 0 0 6px rgba(139, 92, 246, 0.35),
-      0 0 32px rgba(139, 92, 246, 0.4);
-  }
-}
-
-.ai-card-trace-wrap {
-  position: absolute;
-  inset: 0;
-  border-radius: 1rem;
-  overflow: hidden;
-  pointer-events: none;
-  z-index: 0;
-  opacity: 1;
-  /* 0.3s delay + 5.5s grow, then fade away */
-  animation: ai-card-trace-fade-out 0.45s ease 5.8s forwards;
-}
-
-.ai-card-trace-wrap::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  --ai-trace-sweep: 0deg;
-  background: conic-gradient(
-    from 45deg,
-    rgba(30, 27, 75, 0.28)  0deg,
-    rgba(67, 56, 202, 0.62) var(--ai-trace-sweep),
-    transparent             var(--ai-trace-sweep),
-    transparent             360deg
-  );
-  animation: ai-card-trace-grow 5.5s cubic-bezier(0.25, 0.1, 0.25, 1) 0.3s forwards;
-}
-
-.ai-card-trace-wrap::after {
-  content: '';
-  position: absolute;
-  inset: 1.5px;
-  border-radius: 0.875rem;
-  background: #ffffff;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ai-card-trace-wrap::before { animation: none; }
-  .ai-card-trace-wrap { animation: none; opacity: 0; visibility: hidden; }
-}
-
-.ai-spotlight-ring {
-  animation: ai-spotlight-pulse 2.4s ease-in-out infinite;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ai-spotlight-ring { animation: none; }
-}
-
-@keyframes new-tag-shimmer {
-  0% {
-    background-position: -200% center;
-  }
-  100% {
-    background-position: 200% center;
-  }
-}
-
-.new-tag-shimmer {
-  background: linear-gradient(
-    105deg,
-    #7c3aed 0%,
-    #a78bfa 30%,
-    #ffffff 50%,
-    #a78bfa 70%,
-    #7c3aed 100%
-  );
-  background-size: 200% auto;
-  animation: new-tag-shimmer 2.2s linear infinite;
-  -webkit-background-clip: text;
-  background-clip: text;
-  -webkit-text-fill-color: transparent;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .new-tag-shimmer {
-    animation: none;
-    -webkit-text-fill-color: #7c3aed;
-  }
 }
 
 ::-webkit-scrollbar {

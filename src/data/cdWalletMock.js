@@ -99,65 +99,17 @@ export function cdRunwayDays(balance = CD_CURRENT_BALANCE_RUPEES, monthlyBurn = 
   return Math.max(0, Math.round((balance / monthlyBurn) * 30.437))
 }
 
-const CD_UTILIZATION_WINDOW_MS = 30 * 24 * 60 * 60 * 1000
-
 /**
- * @typedef {{ at: string, type: string, amount: number, balanceAfter: number }} CdLedgerTx
+ * Wallet utilization derived from current balance vs peak in trend (demo).
+ * Updates automatically when balance changes (recharge, draft impact, etc.).
  */
-
-/**
- * Wallet utilization since the last recharge, capped to the last 30 days of that period.
- * Opening balance is the wallet balance at period start (last top-up, or 30 days ago if older).
- *
- * @param {number} [balance]
- * @param {CdLedgerTx[]} [transactions]
- * @param {string} [asOfIso]
- */
-export function cdWalletUtilization(
-  balance = CD_CURRENT_BALANCE_RUPEES,
-  transactions = cdTransactions,
-  asOfIso = CD_BALANCE_AS_OF_ISO,
-) {
-  const asOfMs = new Date(asOfIso).getTime()
-  if (!Number.isFinite(asOfMs) || !transactions?.length) {
-    return { remainingBalance: balance, utilizedInr: 0, remainingPct: 100 }
-  }
-
-  const windowStartMs = asOfMs - CD_UTILIZATION_WINDOW_MS
-  const sortedNewestFirst = [...transactions].sort(
-    (a, b) => new Date(b.at).getTime() - new Date(a.at).getTime(),
-  )
-
-  const lastRecharge = sortedNewestFirst.find(
-    (tx) => tx.type === 'deposit' && new Date(tx.at).getTime() <= asOfMs,
-  )
-
-  if (!lastRecharge) {
-    return { remainingBalance: balance, utilizedInr: 0, remainingPct: 100 }
-  }
-
-  const rechargeMs = new Date(lastRecharge.at).getTime()
-  const periodStartMs = Math.max(rechargeMs, windowStartMs)
-
-  let openingBalance = lastRecharge.balanceAfter
-  if (periodStartMs > rechargeMs) {
-    const chronological = [...transactions].sort(
-      (a, b) => new Date(a.at).getTime() - new Date(b.at).getTime(),
-    )
-    for (const tx of chronological) {
-      if (new Date(tx.at).getTime() <= periodStartMs) {
-        openingBalance = tx.balanceAfter
-      } else {
-        break
-      }
-    }
-  }
-
-  const utilizedInr = Math.max(0, openingBalance - balance)
+export function cdWalletUtilization(balance = CD_CURRENT_BALANCE_RUPEES) {
+  const peakBalance = Math.max(...cdBalanceTrend.values, balance)
+  const utilizedInr = Math.max(0, peakBalance - balance)
   const remainingPct =
-    openingBalance > 0 ? Math.min(100, Math.round((balance / openingBalance) * 100)) : 0
-
-  return { remainingBalance: balance, utilizedInr, remainingPct }
+    peakBalance > 0 ? Math.min(100, Math.round((balance / peakBalance) * 100)) : 0
+  const remainingBalance = balance
+  return { remainingBalance, utilizedInr, remainingPct }
 }
 
 export function cdRiskLevel(balance = CD_CURRENT_BALANCE_RUPEES) {

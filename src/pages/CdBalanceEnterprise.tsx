@@ -715,7 +715,7 @@ function StatusBadge({ status }: { status: TxStatus }) {
 }
 
 function CdBalancePrimaryCard({ balance }: { balance: number }) {
-  const { remainingPct, utilizedInr } = cdWalletUtilization(balance, ALL_TRANSACTIONS, CD_BALANCE_AS_OF_ISO)
+  const { remainingPct, utilizedInr } = cdWalletUtilization(balance)
 
   return (
     <section
@@ -724,7 +724,7 @@ function CdBalancePrimaryCard({ balance }: { balance: number }) {
     >
       <p className={W_LABEL}>CD balance</p>
       <p className={`mt-1 ${W_VALUE}`}>{formatInr(balance, false)}</p>
-      <div className="mt-auto pt-4" aria-label="Wallet utilization since last top-up in the last 30 days">
+      <div className="mt-auto pt-4" aria-label="Wallet utilization">
         <div className="mb-1 flex items-center justify-between text-xs font-medium text-gray-600">
           <span>{remainingPct}% remaining</span>
           <span className="tabular-nums text-gray-900">{formatInr(utilizedInr, false)} utilized</span>
@@ -733,10 +733,9 @@ function CdBalancePrimaryCard({ balance }: { balance: number }) {
           <div
             className="h-full rounded-full bg-emerald-500 transition-[width]"
             style={{ width: `${remainingPct}%` }}
-            title={`${remainingPct}% remaining since last top-up (last 30 days)`}
+            title={`${remainingPct}% of balance remaining`}
           />
         </div>
-        <p className="mt-1.5 text-[10px] leading-snug text-gray-400">Since last top-up · last 30 days</p>
       </div>
     </section>
   )
@@ -878,13 +877,13 @@ function CdRechargeEscalation({
 }
 
 function CdBalanceMetricBlock({ balance }: { balance: number }) {
-  const { remainingPct, utilizedInr } = cdWalletUtilization(balance, ALL_TRANSACTIONS, CD_BALANCE_AS_OF_ISO)
+  const { remainingPct, utilizedInr } = cdWalletUtilization(balance)
 
   return (
     <div className="flex min-w-0 flex-col" aria-label="CD balance">
       <p className={W_LABEL}>CD balance</p>
       <p className={`mt-1 ${W_VALUE}`}>{formatInr(balance, false)}</p>
-      <div className="mt-auto w-full pt-4" aria-label="Wallet utilization since last top-up in the last 30 days">
+      <div className="mt-auto w-full pt-4" aria-label="Wallet utilization">
         <div className="mb-1 flex items-center justify-between text-xs font-medium text-gray-600">
           <span>{remainingPct}% remaining</span>
           <span className="tabular-nums text-gray-900">{formatInr(utilizedInr, false)} utilized</span>
@@ -893,10 +892,9 @@ function CdBalanceMetricBlock({ balance }: { balance: number }) {
           <div
             className="h-full rounded-full bg-emerald-500 transition-[width]"
             style={{ width: `${remainingPct}%` }}
-            title={`${remainingPct}% remaining since last top-up (last 30 days)`}
+            title={`${remainingPct}% of balance remaining`}
           />
         </div>
-        <p className="mt-1.5 text-[10px] leading-snug text-gray-400">Since last top-up · last 30 days</p>
       </div>
     </div>
   )
@@ -1178,12 +1176,13 @@ const CD_TX_DATA_CELL = 'px-3 py-3'
 
 const CD_TX_DATA_HEAD = `${PORTAL_TABLE_TH_CLASS} px-3`
 
-/** Transaction ID cell — chevron + ID grouped with consistent gap. */
-const CD_TX_ID_CELL = `${PORTAL_TABLE_CELL_EDGE_PL} align-middle py-3`
+/** Transaction ID cell — tight to checkbox + chevron group (~16px internal gap). */
+const CD_TX_ID_CELL = 'pl-1 pr-2 py-3'
 
-const CD_TX_ID_HEAD = `${PORTAL_TABLE_TH_CLASS} ${PORTAL_TABLE_HEAD_EDGE_PL} min-w-0 py-2`
+/** Leading controls cell — table gutter left only; no right padding (avoids dead space). */
+const CD_TX_LEADING_CELL = 'align-middle py-3 pl-6 pr-0 lg:pl-8'
 
-const CD_TX_ID_INNER = 'flex min-w-0 items-center gap-2'
+const CD_TX_HEAD_LEADING = `${PORTAL_TABLE_TH_CLASS} pl-6 pr-0 lg:pl-8`
 
 /** Neutral secondary for alert pause / resume. */
 const CD_ALERT_SOFT_BTN = `${CD_TABLE_BTN} border border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:bg-gray-50`
@@ -3084,6 +3083,7 @@ export default function CdBalanceEnterprise() {
   const [disputeDateFrom, setDisputeDateFrom] = useState('')
   const [disputeDateTo, setDisputeDateTo] = useState('')
   const [disputeRefPrefill, setDisputeRefPrefill] = useState<string | null>(null)
+  const [selectedTxIds, setSelectedTxIds] = useState<string[]>([])
 
   const [dateRange, setDateRange] = useState<DateRangePreset>('monthly')
   const [txDateFrom, setTxDateFrom] = useState('')
@@ -3157,7 +3157,12 @@ export default function CdBalanceEnterprise() {
 
   useEffect(() => {
     setPage(1)
+    setSelectedTxIds([])
   }, [dateRange, txDateFrom, txDateTo, activitySubTab])
+
+  useEffect(() => {
+    setSelectedTxIds([])
+  }, [page])
 
   useEffect(() => {
     return () => {
@@ -3341,6 +3346,40 @@ export default function CdBalanceEnterprise() {
     setDisputeModalOpen(true)
   }, [])
 
+  const openRaiseDisputeForSelection = useCallback(
+    (ids: string[]) => {
+      if (ids.length === 0) return
+      if (ids.length === 1) {
+        const row = ALL_TRANSACTIONS.find((r) => r.id === ids[0])
+        openRaiseDispute(row?.referenceId ?? null)
+        return
+      }
+      setDisputeScope('selected_transactions')
+      setDisputeBulkTxIds(ids)
+      setDisputeRefPrefill(null)
+      setDisputeSelectedTxId('')
+      setDisputeModalOpen(true)
+    },
+    [openRaiseDispute],
+  )
+
+  const toggleTxSelected = useCallback((id: string) => {
+    setSelectedTxIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
+  }, [])
+
+  const toggleAllPageSelected = useCallback(() => {
+    const pageIds = pageRows.map((r) => r.id)
+    const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedTxIds.includes(id))
+    if (allSelected) {
+      setSelectedTxIds((prev) => prev.filter((id) => !pageIds.includes(id)))
+    } else {
+      setSelectedTxIds((prev) => [...new Set([...prev, ...pageIds])])
+    }
+  }, [pageRows, selectedTxIds])
+
+  const pageAllSelected = pageRows.length > 0 && pageRows.every((r) => selectedTxIds.includes(r.id))
+  const pageSomeSelected = pageRows.some((r) => selectedTxIds.includes(r.id))
+
   const submitProformaRequest = useCallback(
     (amountInr: number) => {
       const n = Math.floor(1000 + Math.random() * 8999)
@@ -3428,6 +3467,7 @@ export default function CdBalanceEnterprise() {
       })
       setDisputesList((prev) => [...newRows, ...prev])
       setDisputeBulkTxIds([])
+      setSelectedTxIds([])
       setDisputeModalOpen(false)
       setActivitySubTab('disputes')
       return
@@ -3630,7 +3670,16 @@ export default function CdBalanceEnterprise() {
           <div className={CD_ACTIVITY_TOOLBAR_SLOT}>
             {activitySubTab === 'transactions' ? (
               <div className={`${CD_ACTIVITY_TOOLBAR_INNER} flex-wrap items-center justify-between gap-2`}>
-                <p className="text-sm text-gray-500">Deposits and deductions from your CD wallet.</p>
+                {selectedTxIds.length > 0 ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium text-indigo-800">{selectedTxIds.length} selected</span>
+                    <button type="button" onClick={() => setSelectedTxIds([])} className={CD_TABLE_BTN_SECONDARY}>
+                      Clear selection
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Deposits and deductions from your CD wallet.</p>
+                )}
                 <div className="flex min-w-0 flex-1 items-center justify-end gap-2 overflow-x-auto sm:[scrollbar-width:none]">
                   <CdDateRangePicker
                     from={txDateFrom}
@@ -3659,6 +3708,13 @@ export default function CdBalanceEnterprise() {
                       </option>
                     ))}
                   </select>
+                  {pageVersion === 'v1' ? (
+                    <CdRaiseDisputeCta
+                      mode="selection"
+                      selectedCount={selectedTxIds.length}
+                      onClick={() => openRaiseDisputeForSelection(selectedTxIds)}
+                    />
+                  ) : null}
                 </div>
               </div>
             ) : activitySubTab === 'proforma' ? (
@@ -3679,15 +3735,31 @@ export default function CdBalanceEnterprise() {
             <div className={PORTAL_TABLE_SCROLL_CLASS}>
             <table className={`${PORTAL_TABLE_CLASS} text-left text-sm`}>
               <colgroup>
-                <col style={{ width: '18%' }} />
-                <col style={{ width: '38%' }} />
+                <col style={{ width: '8%' }} />
+                <col style={{ width: '14%' }} />
+                <col style={{ width: '36%' }} />
                 <col style={{ width: '14%' }} />
                 <col style={{ width: '14%' }} />
-                <col style={{ width: '16%' }} />
+                <col style={{ width: '14%' }} />
               </colgroup>
               <thead className="sticky top-0 z-[1]">
                 <tr className={PORTAL_TABLE_THEAD_TR_CLASS}>
-                  <th className={CD_TX_ID_HEAD}>Transaction ID</th>
+                  <th className={CD_TX_HEAD_LEADING}>
+                    <div className="flex w-fit items-center gap-2">
+                      <input
+                        type="checkbox"
+                        className="h-3.5 w-3.5 cursor-pointer accent-indigo-600"
+                        checked={pageAllSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = pageSomeSelected && !pageAllSelected
+                        }}
+                        onChange={toggleAllPageSelected}
+                        aria-label="Select all transactions on this page"
+                      />
+                      <span className="inline-block w-7 shrink-0" aria-hidden />
+                    </div>
+                  </th>
+                  <th className={`${PORTAL_TABLE_TH_CLASS} min-w-0 !pl-0`}>Transaction ID</th>
                   <th className={`${CD_TX_DATA_HEAD} min-w-0`}>Description</th>
                   <th className={`${CD_TX_DATA_HEAD} text-right`}>Amount</th>
                   <th className={`${CD_TX_DATA_HEAD} text-right`}>Balance</th>
@@ -3697,22 +3769,31 @@ export default function CdBalanceEnterprise() {
               <tbody className="divide-y divide-gray-100">
                 {pageRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className={`${PORTAL_TABLE_EDGE_PL} ${PORTAL_TABLE_EDGE_PR} py-14 text-center align-middle`}>
+                    <td colSpan={6} className={`${PORTAL_TABLE_EDGE_PL} ${PORTAL_TABLE_EDGE_PR} py-14 text-center align-middle`}>
                       <p className="text-sm font-normal text-gray-500">No transactions match your filters.</p>
                     </td>
                   </tr>
                 ) : (
                   pageRows.map((row) => {
+                    const isSelected = selectedTxIds.includes(row.id)
                     const isExpanded = expandedTxId === row.id
                     const deposit = row.depositDetails
                     return (
                     <Fragment key={row.id}>
                     <tr
-                      className={`text-gray-800 transition-colors${row.expandable ? ' cursor-pointer hover:bg-gray-50/50' : ''}${isExpanded ? ' bg-indigo-50/20' : ''}`}
+                      className={`text-gray-800 transition-colors${row.expandable ? ' cursor-pointer hover:bg-gray-50/50' : ''}${isSelected ? ' bg-indigo-50/40' : ''}${isExpanded ? ' bg-indigo-50/20' : ''}`}
                       onClick={() => handleTxRowClick(row)}
                     >
-                      <td className={`whitespace-nowrap ${CD_TX_ID_CELL}`}>
-                        <div className={CD_TX_ID_INNER}>
+                      <td className={CD_TX_LEADING_CELL}>
+                        <div className="flex w-fit items-center gap-2">
+                          <input
+                            type="checkbox"
+                            className="h-3.5 w-3.5 shrink-0 cursor-pointer accent-indigo-600"
+                            checked={isSelected}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={() => toggleTxSelected(row.id)}
+                            aria-label={`Select transaction ${row.transactionId}`}
+                          />
                           {row.expandable ? (
                             <button
                               type="button"
@@ -3733,10 +3814,10 @@ export default function CdBalanceEnterprise() {
                           ) : (
                             <span className="inline-block h-7 w-7 shrink-0" aria-hidden />
                           )}
-                          <span className="min-w-0 truncate font-mono text-xs font-medium text-gray-900">
-                            {row.transactionId}
-                          </span>
                         </div>
+                      </td>
+                      <td className={`whitespace-nowrap align-middle font-mono text-xs font-medium text-gray-900 ${CD_TX_ID_CELL}`}>
+                        {row.transactionId}
                       </td>
                       <td className={`min-w-0 max-w-0 align-middle ${CD_TX_DATA_CELL}`}>
                         <span className="block text-xs font-semibold text-gray-900">{row.typeLabel}</span>
@@ -3762,7 +3843,8 @@ export default function CdBalanceEnterprise() {
                     </tr>
                     {isExpanded && row.expandable ? (
                       <tr className="bg-gray-50/80">
-                        <td colSpan={5} className={`align-top py-0 ${PORTAL_TABLE_EDGE_PL} ${PORTAL_TABLE_EDGE_PR}`}>
+                        <td colSpan={1} className="border-0 p-0" aria-hidden />
+                        <td colSpan={5} className="align-top py-0 pl-1 pr-6 lg:pr-8">
                           {row.category === 'endorsement' ? (
                             <TxEndorsementNestedRow
                               row={row}

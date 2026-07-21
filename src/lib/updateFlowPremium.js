@@ -25,8 +25,6 @@ export function normalizeEmployeeForPremium(raw) {
 
 const MOCK_CD_AVAILABLE_RUPEES = 48_50_000
 
-export { MOCK_CD_AVAILABLE_RUPEES }
-
 /**
  * Rewrites premium line labels so the CD widget matches the active update flow.
  * @param {'quick-update'|'add-spouse'|'add-newborn'|'quick-delete'} flow

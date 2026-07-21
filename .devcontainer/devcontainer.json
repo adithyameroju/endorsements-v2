@@ -1,9 +1,9 @@
 {
   "name": "V2 designs (Node)",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
-  "forwardPorts": [5181, 4180],
+  "forwardPorts": [5180, 4180],
   "portsAttributes": {
-    "5181": { "label": "Vite dev", "onAutoForward": "notify" },
+    "5180": { "label": "Vite dev", "onAutoForward": "notify" },
     "4180": { "label": "Vite preview", "onAutoForward": "silent" }
   },
   "postCreateCommand": "npm install",

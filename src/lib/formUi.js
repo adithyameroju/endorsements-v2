@@ -1,16 +1,17 @@
+import { formSectionShellByAccent, typography } from '../theme/designTokens'
+
 /**
  * Shared Quick Add / dependent / plan form typography and control sizing.
  * Hierarchy: section title (largest) → field label → input text (sm) → helper (xs).
  */
-export const formSectionTitleClass =
-  'text-base font-bold text-gray-900 tracking-tight leading-snug'
+export const formSectionTitleClass = typography.sectionTitle
 
 export const formSectionBadgeClass =
   'flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold'
 
-export const formFieldLabelClass = 'block text-sm font-semibold text-gray-700 mb-2'
+export const formFieldLabelClass = typography.fieldLabel
 
-export const formHelperTextClass = 'text-xs text-gray-500 mt-1.5 leading-snug'
+export const formHelperTextClass = typography.helper
 
 /** Inputs and selects: one consistent height across Basic info, Plans, Dependents */
 export const formControlClass =
@@ -18,12 +19,19 @@ export const formControlClass =
 
 export const formControlErrorClass = 'border-red-300 bg-red-50/30'
 
-/** Section shells aligned with Quick Add Employees (left accent + white card). */
-export const updateFormSectionShell = {
-  basic:
-    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-indigo-500',
-  plans:
-    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-sky-500',
-  dependents:
-    'rounded-xl border border-gray-200/90 bg-white shadow-sm p-4 pl-3.5 border-l-[3px] border-l-violet-500',
-}
+/** Native select: hide default chevron and reserve right padding. */
+export const selectNativeChevronClass =
+  'appearance-none bg-[length:0.75rem] bg-[position:right_0.625rem_center] bg-no-repeat pr-8 bg-[url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%239ca3af%27 stroke-width=%272%27 stroke-linecap=%27round%27 stroke-linejoin=%27round%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E")]'
+
+export const formSelectClass = `${formControlClass} ${selectNativeChevronClass}`
+
+/** Custom dropdown trigger — label left, chevron right with breathing room. */
+export const dropdownTriggerClass =
+  'inline-flex w-full min-w-0 cursor-pointer items-center justify-between gap-2 text-left'
+
+export const dropdownTriggerLabelClass = 'min-w-0 flex-1 truncate'
+
+export const dropdownChevronClass = 'h-3.5 w-3.5 shrink-0 text-gray-400'
+
+/** Section shells aligned with Quick Add Employees (left accent + white card). Source: theme/designTokens.js */
+export const updateFormSectionShell = formSectionShellByAccent

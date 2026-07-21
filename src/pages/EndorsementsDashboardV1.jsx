@@ -1,9 +1,6 @@
-import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, CalendarClock, ChevronRight, Sparkles } from 'lucide-react'
+import { UserPlus, UserCog, UserMinus, RefreshCw, ArrowRight, CalendarClock, ChevronRight } from 'lucide-react'
 import EndorsementHistoryV1 from '../components/EndorsementHistoryV1'
-import EndorsementsExperienceSelect from '../components/EndorsementsExperienceSelect'
-import AiEndorsementSpotlight from '../components/AiEndorsementSpotlight'
 import { hrmsJoiningEmployees, hrmsLeavingEmployees } from '../data/mockData'
 
 const pendingHrmsCount = hrmsJoiningEmployees.length + hrmsLeavingEmployees.length
@@ -36,62 +33,33 @@ const actions = [
     borderColor: 'border-rose-100 hover:border-rose-200',
     path: '/delete',
   },
-  {
-    title: 'AI Endorsements',
-    description: 'Upload any file and let AI extract additions, updates, and deletions',
-    icon: Sparkles,
-    iconBg: 'bg-gradient-to-br from-indigo-500 to-violet-600',
-    decorBg: 'bg-violet-100',
-    borderColor: 'border-violet-100 hover:border-violet-300',
-    path: '/ai-endorsements',
-    ai: true,
-  },
 ]
 
-/**
- * @param {{ experience: string, onExperienceChange: (value: string) => void }} props
- */
-export default function EndorsementsDashboardV1({ experience, onExperienceChange }) {
+export default function EndorsementsDashboard() {
   const navigate = useNavigate()
-  const aiCardRef = useRef(null)
-  const [showAiIntro, setShowAiIntro] = useState(true)
-
-  const dismissAiIntro = () => setShowAiIntro(false)
 
   return (
-    <div className="flex flex-col h-full px-6 lg:px-8 pt-7 pb-6">
-      <div className="mb-5 flex-shrink-0 flex items-start justify-between gap-3">
-        <div className="min-w-0">
+    <div className="flex flex-col h-full px-6 lg:px-8 py-6">
+      <div className="mb-5 flex-shrink-0 flex items-start justify-between">
+        <div>
           <h1 className="text-2xl font-bold text-gray-900">Endorsements</h1>
           <p className="text-sm text-gray-500 mt-1">Run add, update, or delete endorsements. HRMS-driven changes are reviewed separately.</p>
         </div>
-        <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-2">
-          <EndorsementsExperienceSelect value={experience} onChange={onExperienceChange} />
-          <button
-            type="button"
-            onClick={() => navigate('/endorsements/schedule')}
-            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 transition-all cursor-pointer flex-shrink-0"
-          >
-            <CalendarClock size={16} />
-            Endorsement Schedule
-          </button>
-        </div>
+        <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-xl hover:bg-indigo-100 hover:border-indigo-300 transition-all cursor-pointer flex-shrink-0">
+          <CalendarClock size={16} />
+          Endorsement Schedule
+        </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-3 flex-shrink-0">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-3 flex-shrink-0">
         {actions.map((item) => {
           const Icon = item.icon
           return (
             <button
               key={item.title}
-              ref={item.ai ? aiCardRef : undefined}
-              onClick={() => {
-                if (item.ai && showAiIntro) dismissAiIntro()
-                navigate(item.path)
-              }}
-              className={`group relative overflow-hidden flex flex-col justify-between p-5 bg-white rounded-2xl border ${item.borderColor} transition-all hover:shadow-lg cursor-pointer text-left min-h-[130px] ${item.ai && showAiIntro ? 'z-[260]' : ''}`}
+              onClick={() => navigate(item.path)}
+              className={`group relative overflow-hidden flex flex-col justify-between p-5 bg-white rounded-2xl border ${item.borderColor} transition-all hover:shadow-lg cursor-pointer text-left min-h-[130px]`}
             >
-              {item.ai && <span aria-hidden="true" className="ai-card-trace-wrap" />}
               <div className={`absolute -top-6 -right-6 w-24 h-24 ${item.decorBg} rounded-full opacity-60 group-hover:opacity-80 transition-opacity pointer-events-none`} />
               <div className={`absolute -top-3 -right-3 w-16 h-16 ${item.decorBg} rounded-full opacity-40 pointer-events-none`} />
 
@@ -100,11 +68,6 @@ export default function EndorsementsDashboardV1({ experience, onExperienceChange
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${item.iconBg} shadow-sm`}>
                     <Icon size={22} className="text-white" />
                   </div>
-                  {item.ai && (
-                    <span className="relative inline-flex items-center px-2 py-0.5 rounded-full border border-violet-300 bg-violet-50 overflow-hidden">
-                      <span className="new-tag-shimmer text-[10px] font-extrabold tracking-widest uppercase select-none">New</span>
-                    </span>
-                  )}
                 </div>
                 <h3 className="text-sm font-bold text-gray-900 mb-0.5">{item.title}</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">{item.description}</p>
@@ -142,12 +105,6 @@ export default function EndorsementsDashboardV1({ experience, onExperienceChange
       <div className="flex-1 min-h-0">
         <EndorsementHistoryV1 />
       </div>
-
-      <AiEndorsementSpotlight
-        targetRef={aiCardRef}
-        open={showAiIntro}
-        onDismiss={dismissAiIntro}
-      />
     </div>
   )
 }

@@ -1,8 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Layout from './components/Layout'
 import { EndorsementProvider } from './store/EndorsementStore'
-import { EntityProvider } from './context/EntityContext'
-import { AlertsProvider } from './context/AlertsContext'
 import EndorsementsDashboard from './pages/EndorsementsDashboard'
 import AddEmployee from './pages/AddEmployee'
 import QuickAdd from './pages/QuickAdd'
@@ -18,8 +16,10 @@ import QuickDelete from './pages/QuickDelete'
 import BulkDelete from './pages/BulkDelete'
 import HRMSSync from './pages/HRMSSync'
 import EndorsementSchedule from './pages/EndorsementSchedule'
-import CdBalanceEnterprise from './pages/CdBalanceEnterprise'
 import AiEndorsements from './pages/AiEndorsements'
+import CdBalanceEnterprise from './pages/CdBalanceEnterprise'
+import { EntityProvider } from './context/EntityContext'
+import { AlertsProvider } from './context/AlertsContext'
 
 export default function App() {
   return (
@@ -30,6 +30,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<EndorsementsDashboard />} />
               <Route path="/endorsements/schedule" element={<EndorsementSchedule />} />
+              <Route path="/endorsements/ai" element={<AiEndorsements />} />
               <Route path="/add" element={<AddEmployee />} />
               <Route path="/add/quick" element={<QuickAdd />} />
               <Route path="/add/bulk" element={<BulkUpload />} />
@@ -44,7 +45,6 @@ export default function App() {
               <Route path="/delete/bulk" element={<BulkDelete />} />
               <Route path="/hrms-sync" element={<HRMSSync />} />
               <Route path="/cd-balance" element={<CdBalanceEnterprise />} />
-              <Route path="/ai-endorsements" element={<AiEndorsements />} />
               {/* Sidebar links (Dashboard, Claims, etc.) point here until those pages exist */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>

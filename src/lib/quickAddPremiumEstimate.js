@@ -150,6 +150,41 @@ export function buildQuickAddPremiumBreakdown(employees) {
   }
 }
 
+const ENDORSEMENT_BUCKET_LABELS = {
+  onboarding: 'Additions (onboarding)',
+  add_dependent: 'Add dependents',
+  update: 'Updates',
+  delete: 'Deletions',
+  offboard: 'Offboards',
+}
+
+/**
+ * Premium breakdown with per–endorsement-type bucket lines for AI Endorsements preview.
+ */
+export function buildAiEndorsementPremiumBreakdown(employees) {
+  const base = buildQuickAddPremiumBreakdown(employees)
+  const byType = {}
+  for (const emp of employees) {
+    const t = emp.endorsementType || 'onboarding'
+    if (!byType[t]) byType[t] = []
+    byType[t].push(emp)
+  }
+
+  const bucketLines = []
+  for (const [type, group] of Object.entries(byType)) {
+    if (type === 'delete' || type === 'offboard') continue
+    const { totalInclGst: amt } = buildQuickAddPremiumBreakdown(group)
+    if (amt <= 0) continue
+    bucketLines.push({
+      id: `bucket_${type}`,
+      label: ENDORSEMENT_BUCKET_LABELS[type] || type,
+      amount: amt,
+    })
+  }
+
+  return { ...base, bucketLines }
+}
+
 const PLAN_LINE_IDS = ['gmc_base', 'gpa_base', 'gmc_secondary', 'gmc_addons']
 
 /**

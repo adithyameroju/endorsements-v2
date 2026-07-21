@@ -1,4 +1,5 @@
-const STORAGE_KEY = 'v2-designs-endorsements-experience'
+/** Bumped key so prior “V1” prefs don’t hide Update 2.0 (AI Endorsements). */
+const STORAGE_KEY = 'v2-designs-endorsements-experience-2026-07'
 
 export const ENDORSEMENT_EXPERIENCE_V1 = 'v1'
 export const ENDORSEMENT_EXPERIENCE_V2 = 'v2'
@@ -12,6 +13,7 @@ export function readEndorsementExperienceVersion() {
   } catch {
     /* ignore */
   }
+  // Default: Update 2.0 (includes AI Endorsements)
   return ENDORSEMENT_EXPERIENCE_V2
 }
 
